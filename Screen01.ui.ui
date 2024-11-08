@@ -1,11 +1,3 @@
-
-
-/*
-This is a UI file (.ui.qml) that is intended to be edited in Qt Design Studio only.
-It is supposed to be strictly declarative and only uses a subset of QML. If you edit
-this file manually, you might introduce QML code that is not supported by Qt Design Studio.
-Check out https://doc.qt.io/qtcreator/creator-quick-ui-forms.html for details on .ui.qml files.
-*/
 import QtQuick
 import QtQuick.Controls
 import ZZZApp
@@ -138,7 +130,7 @@ Rectangle {
         x: 299
         y: 111
         visible: roundButtonZenless.checked
-        text: backend.data
+        text: qsTr("Text")
         font.pixelSize: 12
     }
 
@@ -146,7 +138,6 @@ Rectangle {
         id: _text2
         x: 637
         y: 192
-        text: backend.data
         font.pixelSize: 12
     }
 
@@ -164,12 +155,6 @@ Rectangle {
                 visible: roundButtonSpotify.checked
                 text: qsTr("Spotify")
                 font.pixelSize: 59
-            }
-
-            PropertyChanges {
-                target: _text1
-                x: 671
-                y: 207
             }
         },
         State {
