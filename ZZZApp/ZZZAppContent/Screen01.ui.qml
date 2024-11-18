@@ -6,7 +6,7 @@ It is supposed to be strictly declarative and only uses a subset of QML. If you 
 this file manually, you might introduce QML code that is not supported by Qt Design Studio.
 Check out https://doc.qt.io/qtcreator/creator-quick-ui-forms.html for details on .ui.qml files.
 */
-import QtQuick
+import QtQuick 2.15
 import QtQuick.Controls
 import ZZZApp
 import QtQuick.Studio.Components 1.0
@@ -133,12 +133,37 @@ Rectangle {
         font.pixelSize: 12
     }
 
+    Rectangle {
+        id: rectangle2
+        x: 529
+        y: 182
+        width: 303
+        height: 200
+        color: "#762f2f"
+
+        Slider {
+            id: slider
+            x: 52
+            y: 80
+            value: 0.2
+        }
+    }
+
+    Rectangle {
+        id: rectangle3
+        x: controller.x
+        y: controller.y
+        width: 382
+        height: 14
+        color: "#2153ed"
+    }
+
     Text {
         id: _text1
         x: 299
         y: 111
         visible: roundButtonZenless.checked
-        text: backend.data
+        text: "test"
         font.pixelSize: 12
     }
 
@@ -146,8 +171,18 @@ Rectangle {
         id: _text2
         x: 637
         y: 192
-        text: backend.data
+        color: "#ffffff"
+        text: "backend.data"
         font.pixelSize: 12
+    }
+
+    ProgressBar {
+        id: progressBar
+        x: 542
+        y: 325
+        width: 275
+        height: 6
+        value: 0.5
     }
 
     states: [
