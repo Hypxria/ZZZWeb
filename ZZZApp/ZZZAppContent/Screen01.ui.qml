@@ -153,7 +153,7 @@ Rectangle {
         id: rectangle3
         x: controller.x
         y: controller.y
-        width: 382
+        width: controller.width
         height: 14
         color: "#2153ed"
     }

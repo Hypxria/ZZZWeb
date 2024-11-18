@@ -53,10 +53,13 @@ from autogen.settings import url, import_paths
 class RectangleController(QObject):
     xChanged = Signal()
     yChanged = Signal()
+    widthChanged = Signal()
+    
     def __init__(self):
         super().__init__()
         self._x = 29
-        self._y = 382
+        self._y = 200
+        self._width = 900
 
     @Property(int, notify=xChanged)
     def x(self):
@@ -72,11 +75,21 @@ class RectangleController(QObject):
     def y(self):
         return self._y
 
-    @y.setter
+    @y.setter   
     def y(self, value):
         if self._y != value:
             self._y = value
             self.yChanged.emit()
+            
+    @Property(int, notify=widthChanged)
+    def width(self):
+        return self._width
+    
+    @width.setter
+    def width(self, value):
+        if self._width != value:
+            self._width = value
+            self.widthChanged.emit()
 
     @Slot(int, int)
     def moveRectangle(self, new_x, new_y):
