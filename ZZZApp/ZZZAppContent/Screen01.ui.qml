@@ -124,65 +124,39 @@ Rectangle {
         }
     }
 
-    Text {
-        id: _text
-        x: 210
-        y: 220
-        visible: roundButtonSpotify.checked
-        text: qsTr("Text")
-        font.pixelSize: 12
-    }
-
     Rectangle {
         id: rectangle2
-        x: 529
-        y: 182
-        width: 303
-        height: 200
+        x: 540
+        y: 80
+        width: 200
+        height: rectangle2.width
         color: "#762f2f"
-
-        Slider {
-            id: slider
-            x: 52
-            y: 80
-            value: 0.2
-        }
     }
 
     Rectangle {
         id: rectangle3
-        x: controller.x
-        y: controller.y
+        x: 434
+        y: 378
         width: controller.width
         height: 14
+        visible: true
         color: "#2153ed"
+        transformOrigin: Item.Left
+
+        Connections {
+            target: rectangle3
+            onActiveFocusChanged: console.log("clicked")
+        }
     }
 
-    Text {
-        id: _text1
-        x: 299
-        y: 111
-        visible: roundButtonZenless.checked
-        text: "test"
-        font.pixelSize: 12
-    }
-
-    Text {
-        id: _text2
-        x: 637
-        y: 192
-        color: "#ffffff"
-        text: "backend.data"
-        font.pixelSize: 12
-    }
-
-    ProgressBar {
-        id: progressBar
-        x: 542
-        y: 325
-        width: 275
-        height: 6
-        value: 0.5
+    Image {
+        id: image
+        x: 540
+        y: 80
+        width: 200
+        height: 200
+        source: controller.songUrl
+        fillMode: Image.PreserveAspectFit
     }
 
     states: [
@@ -191,20 +165,24 @@ Rectangle {
             when: roundButtonSpotify.checked
 
             PropertyChanges {
-                target: _text
-                x: 210
-                y: 61
-                width: 356
-                height: 175
-                visible: roundButtonSpotify.checked
-                text: qsTr("Spotify")
-                font.pixelSize: 59
+                target: rectangle3
+                visible: true
             }
 
             PropertyChanges {
-                target: _text1
-                x: 671
-                y: 207
+                target: rectangle2
+                x: 523
+                y: 68
+                width: 235
+                height: rectangle2.width
+            }
+
+            PropertyChanges {
+                target: image
+                x: 523
+                y: 68
+                width: 235
+                height: 229
             }
         },
         State {
@@ -214,13 +192,6 @@ Rectangle {
             PropertyChanges {
                 target: roundButtonZenless
                 checkable: true
-            }
-
-            PropertyChanges {
-                target: _text1
-                visible: roundButtonZenless.checked
-                text: qsTr("Zenless")
-                font.pixelSize: 59
             }
         }
     ]
