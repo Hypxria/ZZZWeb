@@ -260,6 +260,7 @@ Rectangle {
             }
 
             PropertyChanges {
+                id: propertyChanges
                 target: coverImage
                 x: 523
                 y: 59
@@ -322,6 +323,11 @@ Rectangle {
             PropertyChanges {
                 target: rectangle1
                 visible: false
+            }
+
+            PropertyChanges {
+                target: propertyChanges
+                explicit: true
             }
         },
         State {
