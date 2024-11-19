@@ -44,22 +44,18 @@ device_name = sp_controller.init_default_device(socket.gethostname().lower())
 class InformationBinding(QObject):
     xChanged = Signal()
     yChanged = Signal()
-    widthChanged = Signal()
     heightChanged = Signal()
     songUrlChanged = Signal()
+    songPercentChanged = Signal()
     
     def __init__(self):
         super().__init__()
         self._x = 29
         self._y = 200
-        self._width = sp_controller.getPlaybackProgressPercentage()*413 
-        print(self._width)
         self._height = 600
         self._songUrl = sp_controller.getCoverImage()
-        
-        self.animation = QPropertyAnimation(self, b"width")
-        self.animation.setDuration(500)  # Duration in milliseconds
-        self.animation.setEasingCurve(QEasingCurve.Linear)
+        self._songPercent = sp_controller.getPlaybackProgressPercentage()
+        print(self._songPercent)
         
         # Create Timer
         self.cover_timer = QTimer(self)
@@ -69,21 +65,18 @@ class InformationBinding(QObject):
         
         self.progress_timer = QTimer(self)
         self.progress_timer.setInterval(50)  # More frequent progress updates
-        self.progress_timer.timeout.connect(self.updateWidth)
+        self.progress_timer.timeout.connect(self.updateProgress)
         self.progress_timer.start()
 
-    def animateWidth(self):
-        new_width = sp_controller.getPlaybackProgressPercentage()*413
-        current_width = self._width
-        
-        # Smoother transition logic
-        if abs(new_width - current_width) > 1:  # Smaller threshold
-            self.animation.stop()
-            self.animation.setStartValue(current_width)
-            self.animation.setEndValue(new_width)
-            self.animation.start()
-
-
+    @Property(float, notify=songPercentChanged)
+    def songPercent(self):
+        return self._songPercent
+    
+    @songPercent.setter
+    def songPercent(self, value):
+        if self._songPercent != value:
+            self._songPercent = value
+            self.songPercentChanged.emit()
     
     @Property(str, notify=songUrlChanged)
     def songUrl(self):
@@ -114,31 +107,12 @@ class InformationBinding(QObject):
         if self._y != value:
             self._y = value
             self.yChanged.emit()
-        
-    def delayed_change(self, widthAmount):
-        self._width = widthAmount   
-        self.widthChanged.emit()
-        
-    @Slot()
-    def start_delayed_change(self):
-        # Create and start timer when method is called
-        QTimer.singleShot(1, self.delayed_change)
-         
-    @Property(int, notify=widthChanged)
-    def width(self):
-        return self._width
-
-    @width.setter
-    def width(self, value):
-        if self._width != value:
-            self._width = value
-            self.widthChanged.emit()
     
     @Property(int, notify=heightChanged)
     def height(self):
         return self._height
     
-    @width.setter
+    @height.setter
     def height(self, value):
         if self._height != value:
             self._height = value
@@ -157,11 +131,13 @@ class InformationBinding(QObject):
             self.songUrlChanged.emit()
     
     @Slot()    
-    def updateWidth(self):
-        new_width = sp_controller.getPlaybackProgressPercentage()*413
-        if new_width != self._width:
-            self._width = new_width
-            self.widthChanged.emit()
+    def updateProgress(self):
+        new_percent = sp_controller.getPlaybackProgressPercentage()
+        if new_percent != self._songPercent:
+            self._songPercent = new_percent
+            self.songPercentChanged.emit()
+
+
             
 
 
