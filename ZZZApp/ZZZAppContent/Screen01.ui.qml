@@ -20,8 +20,10 @@ Rectangle {
     color: Constants.backgroundColor
 
     GroupItem {
-        id: groupItem
+        id: musicMenu
         y: 56
+        width: Constants.width
+        height: Constants.height
         anchors.horizontalCenter: parent.horizontalCenter
 
         Image {
@@ -80,19 +82,20 @@ Rectangle {
                 width: customSlider.availableWidth
                 height: 4 // Height of the slider track
                 radius: 2
-                color: "#e0e0e0" // Empty/background color
+                color: controller.songColorBright // Empty/background color
 
                 // This is the filled portion
                 Rectangle {
                     width: customSlider.visualPosition * parent.width
                     height: parent.height
-                    color: "#1db954" // Fill color
+                    color: controller.songColorAvg // Fill color
                     radius: 2
                 }
             }
 
             // Custom handle (the part you drag)
             handle: Rectangle {
+                id: rectangle1
                 x: customSlider.leftPadding + customSlider.visualPosition
                    * (customSlider.availableWidth - width)
                 y: customSlider.topPadding + customSlider.availableHeight / 2 - height / 2
@@ -253,6 +256,7 @@ Rectangle {
                 width: 235
                 height: coverImageContainer.width
                 visible: true
+                radius: 7
             }
 
             PropertyChanges {
@@ -261,6 +265,7 @@ Rectangle {
                 y: 59
                 width: coverImageContainer.width
                 height: coverImageContainer.height
+
                 anchors.verticalCenterOffset: -1
                 anchors.horizontalCenterOffset: 0
             }
@@ -289,7 +294,7 @@ Rectangle {
             }
 
             PropertyChanges {
-                target: groupItem
+                target: musicMenu
                 x: 89
                 y: 0
                 width: 1281
@@ -304,12 +309,19 @@ Rectangle {
                 width: 1281
                 height: 400
                 visible: true
+                scale: 3.476
+                rotation: 180
                 fillMode: Image.Stretch
             }
 
             PropertyChanges {
                 target: designEffect1
                 layerBlurRadius: 100
+            }
+
+            PropertyChanges {
+                target: rectangle1
+                visible: false
             }
         },
         State {

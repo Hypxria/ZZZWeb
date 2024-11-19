@@ -1,11 +1,14 @@
 from rich import print
 from spotipy import Spotify
+from PIL import Image
+import requests
+from io import BytesIO
+import numpy as np
 import json
 
 # catching errors
 class InvalidSearchError(Exception):
     pass
-
 
 def exit_application() -> None:
     
@@ -21,10 +24,36 @@ class SpotifyController:
     # This class provides methods for various Spotify operations such as
     # playing tracks, managing playlists, and controlling playback.
     
-
+    def get_average_hex_color(self, image_url):
+        try:
+            # Download image from URL
+            response = requests.get(image_url)
+            img = Image.open(BytesIO(response.content))
+            
+            # Convert image to RGB if it isn't
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Convert to numpy array for faster processing
+            img_array = np.array(img)
+            
+            # Calculate average color
+            average_color = np.mean(img_array, axis=(0,1))
+            
+            # Convert to integers
+            r, g, b = [int(x) for x in average_color]
+            
+            # Convert to hex
+            hex_color = f"#{r:02x}{g:02x}{b:02x}"
+            return hex_color.upper()  # Return uppercase hex
+            
+        except Exception as e:
+            print(f"Error processing image: {str(e)}")
+            return "#000000"  # Return black as fallback
+    
     def __init__(self, spotify: Spotify):
         # 
-        # Vianney notes:
+        # Notes:
         # contructor class, is run the moment that sp_controller = SpotifyController(sp) in main
         #
         # Initialize the SpotifyController.
@@ -310,9 +339,7 @@ class SpotifyController:
         # images[0] = large
         # images[1] = medium
         # images[2] = small
-        return images[0]['url']
-    
-    
+        return images[0]['url']    
 
     def shuffle(self, state: str = None) -> None:
         # 

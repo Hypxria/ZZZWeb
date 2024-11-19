@@ -1,18 +1,17 @@
-
 import os
 import sys
 import dotenv
 from pathlib import Path
 import socket
 from PySide6.QtCore import QObject, Slot, Property, Signal, QTimer, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QColor
 from PySide6.QtQml import QQmlApplicationEngine
 from autogen.settings import url, import_paths
 from spotipy.oauth2 import SpotifyOAuth
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
-from PySide6.QtCore import QObject, Signal, Property, QTimer
 from methods import *
+from PySide6.QtCore import QObject, Slot, Property, Signal, QTimer
+from dataclasses import dataclass
 
 dotenv.load_dotenv()
 SPOTIFY_CLIENT_ID = os.getenv("CLIENT_ID")
@@ -27,11 +26,12 @@ SPOTIFY_SCOPES = [
     "user-top-read", "playlist-modify-public"
 ]
 
+# Setting required variables to interact with Spotify API
 sp = spotipy.Spotify(
     auth_manager=SpotifyOAuth(
         scope=",".join(SPOTIFY_SCOPES),
-        client_id=SPOTIFY_CLIENT_ID,
-        client_secret=SPOTIFY_CLIENT_SECRET,
+        client_id = SPOTIFY_CLIENT_ID,
+        client_secret = SPOTIFY_CLIENT_SECRET,
         redirect_uri="http://localhost:8888/callback"
     ),
     requests_timeout=300
@@ -42,110 +42,143 @@ device_name = sp_controller.init_default_device(socket.gethostname().lower())
 
 
 class InformationBinding(QObject):
-    xChanged = Signal()
-    yChanged = Signal()
-    heightChanged = Signal()
+    """Handles Spotify state management and UI updates"""
+    
+    # Signal definitions
     songUrlChanged = Signal()
     songPercentChanged = Signal()
-    
-    def __init__(self):
-        super().__init__()
-        self._x = 29
-        self._y = 200
-        self._height = 600
-        self._songUrl = sp_controller.getCoverImage()
-        self._songPercent = sp_controller.getPlaybackProgressPercentage()
-        print(self._songPercent)
-        
-        # Create Timer
-        self.cover_timer = QTimer(self)
-        self.cover_timer.setInterval(1000)  # Cover can update less frequently
-        self.cover_timer.timeout.connect(self.updateCover)
-        self.cover_timer.start()
-        
-        self.progress_timer = QTimer(self)
-        self.progress_timer.setInterval(50)  # More frequent progress updates
-        self.progress_timer.timeout.connect(self.updateProgress)
-        self.progress_timer.start()
+    songColorAvgChanged = Signal()
+    songColorBrightChanged = Signal()
 
-    @Property(float, notify=songPercentChanged)
-    def songPercent(self):
-        return self._songPercent
+    def __init__(self, spotifyController):
+        super().__init__()
+        self._spotifyController = spotifyController
+        
+        # Initialize state values
+        self._songUrl = self._spotifyController.getCoverImage()
+        self._songPercent = self._spotifyController.getPlaybackProgressPercentage()
+        self._songColorAvg = self._spotifyController.get_average_hex_color(self._songUrl)
+        
+        
+        self._setupTimers()
+
+    def _setupTimers(self) -> None:
+        """Setup and start update timers"""
+        self._setupCoverTimer()
+        self._setupProgressTimer()
+
+    def _setupCoverTimer(self) -> None:
+        """Setup timer for cover image updates"""
+        self.coverTimer = QTimer(self)
+        self.coverTimer.setInterval(1000)  # Update every second
+        self.coverTimer.timeout.connect(self.updateCover)
+        self.coverTimer.start()
+
+    def _setupProgressTimer(self) -> None:
+        """Setup timer for progress updates"""
+        self.progressTimer = QTimer(self)
+        self.progressTimer.setInterval(50)  # Update every 50ms
+        self.progressTimer.timeout.connect(self.updateProgress)
+        self.progressTimer.start()
+
+    # Spotify Properties
+    @Property(str, notify=songColorBrightChanged)
+    def songColorBright(self) -> str:
+        try:
+            color = QColor(self._songColorAvg)
+            h, s, l, _ = color.getHslF()
+            brighter_color = QColor.fromHslF(
+                h,
+                s,
+                min(1.0, l * 1.5),  # Increase lightness by 50%, cap at 1.0
+                1.0
+            )
+            return brighter_color.name(QColor.HexRgb)
+        except:
+            return "#FFFFFF"  # Return white as fallback
+
+    @songColorBright.setter
+    def songColorBright(self, value: str) -> None:
+        if self._songColorBright != value:
+            self._songColorBright = value
+            self.songColorBrightChanged.emit()
+            
+    @Property(str, notify=songColorAvgChanged)
+    def songColorAvg(self) -> str:
+        return self._songColorAvg
     
-    @songPercent.setter
-    def songPercent(self, value):
-        if self._songPercent != value:
-            self._songPercent = value
-            self.songPercentChanged.emit()
+    @songColorAvg.setter
+    def songColorAvg(self, value: str) -> None:
+        if self._songColorAvg != value:
+            self._songColorAvg = value
+            self.songColorAvgChanged.emit()
     
     @Property(str, notify=songUrlChanged)
-    def songUrl(self):
+    def songUrl(self) -> str:
         return self._songUrl
-    
+
     @songUrl.setter
-    def songUrl(self, value):
+    def songUrl(self, value: str) -> None:
         if self._songUrl != value:
             self._songUrl = value
             self.songUrlChanged.emit()
 
-    @Property(int, notify=xChanged)
-    def x(self):
-        return self._x
+    @Property(float, notify=songPercentChanged)
+    def songPercent(self) -> float:
+        return self._songPercent
 
-    @x.setter
-    def x(self, value):
-        if self._x != value:
-            self._x = value
-            self.xChanged.emit()
-
-    @Property(int, notify=yChanged)
-    def y(self):
-        return self._y
-
-    @y.setter   
-    def y(self, value):
-        if self._y != value:
-            self._y = value
-            self.yChanged.emit()
-    
-    @Property(int, notify=heightChanged)
-    def height(self):
-        return self._height
-    
-    @height.setter
-    def height(self, value):
-        if self._height != value:
-            self._height = value
-            self.heightChanged.emit()
-
-    @Slot(int, int)
-    def moveRectangle(self, new_x, new_y):
-        self.x = new_x
-        self.y = new_y
-    
-    @Slot()
-    def updateCover(self):
-        new_url = sp_controller.getCoverImage()
-        if new_url != self._songUrl:
-            self._songUrl = new_url
-            self.songUrlChanged.emit()
-    
-    @Slot()    
-    def updateProgress(self):
-        new_percent = sp_controller.getPlaybackProgressPercentage()
-        if new_percent != self._songPercent:
-            self._songPercent = new_percent
+    @songPercent.setter
+    def songPercent(self, value: float) -> None:
+        if self._songPercent != value:
+            self._songPercent = value
             self.songPercentChanged.emit()
 
+    @Slot()
+    def updateCover(self) -> None:
+        """Update the cover image URL from Spotify"""
+        try:
+            newUrl = self._spotifyController.getCoverImage()
+            if newUrl != self._songUrl:
+                self.songUrl = newUrl
+        except Exception as e:
+            print(f"Error updating cover: {e}")
 
-            
+    @Slot()
+    def updateProgress(self) -> None:
+        """Update the song progress from Spotify"""
+        try:
+            newPercent = self._spotifyController.getPlaybackProgressPercentage()
+            if newPercent != self._songPercent:
+                self.songPercent = newPercent
+        except Exception as e:
+            print(f"Error updating progress: {e}")
+
+    def cleanup(self) -> None:
+        """Cleanup timers and resources"""
+        self.coverTimer.stop()
+        self.progressTimer.stop()
 
 
 if __name__ == '__main__':
     app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
     
-    controller = InformationBinding()
+    # First create the Spotify controller
+    sp = spotipy.Spotify(
+        auth_manager=SpotifyOAuth(
+            scope=",".join(SPOTIFY_SCOPES),
+            client_id=SPOTIFY_CLIENT_ID,
+            client_secret=SPOTIFY_CLIENT_SECRET,
+            redirect_uri="http://localhost:8888/callback"
+        ),
+        requests_timeout=300
+    )
+    
+    sp_controller = SpotifyController(sp)
+    device_name = sp_controller.init_default_device(socket.gethostname().lower())
+    
+    # Then pass it to InformationBinding
+    controller = InformationBinding(sp_controller)
     engine.rootContext().setContextProperty("controller", controller)
 
     app_dir = Path(__file__).parent.parent
