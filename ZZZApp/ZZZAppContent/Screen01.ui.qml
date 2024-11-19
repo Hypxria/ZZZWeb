@@ -19,7 +19,7 @@ Rectangle {
     color: Constants.backgroundColor
 
     Rectangle {
-        id: rectangle1
+        id: baseMenu
         y: -69
         width: 192
         height: 115
@@ -142,11 +142,6 @@ Rectangle {
         visible: true
         color: "#2153ed"
         transformOrigin: Item.Left
-
-        Connections {
-            target: rectangle3
-            onActiveFocusChanged: console.log("clicked")
-        }
     }
 
     Image {
@@ -157,6 +152,48 @@ Rectangle {
         height: 200
         source: controller.songUrl
         fillMode: Image.PreserveAspectFit
+    }
+    Slider {
+        id: customSlider
+        x: 194
+        y: 214
+        width: 200
+        height: 20
+        value: 0.5
+        anchors.horizontalCenterOffset: 429
+        // Initial value (0.0 to 1.0)
+
+        // Custom styling
+        background: Rectangle {
+            x: customSlider.leftPadding
+            y: customSlider.topPadding + customSlider.availableHeight / 2 - height / 2
+            width: customSlider.availableWidth
+            height: 4 // Height of the slider track
+            radius: 2
+            color: "#e0e0e0" // Empty/background color
+
+            // This is the filled portion
+            Rectangle {
+                width: customSlider.visualPosition * parent.width
+                height: parent.height
+                color: "#1db954" // Fill color
+                radius: 2
+            }
+        }
+
+        // Custom handle (the part you drag)
+        handle: Rectangle {
+            x: customSlider.leftPadding + customSlider.visualPosition
+               * (customSlider.availableWidth - width)
+            y: customSlider.topPadding + customSlider.availableHeight / 2 - height / 2
+            width: 16
+            height: 16
+            opacity: 1
+            radius: 8
+            color: customSlider.pressed ? "#f0f0f0" : "#ffffff"
+            border.color: "#1db954"
+            border.width: 0
+        }
     }
 
     states: [
@@ -172,17 +209,29 @@ Rectangle {
             PropertyChanges {
                 target: rectangle2
                 x: 523
-                y: 68
+                y: 56
                 width: 235
                 height: rectangle2.width
             }
 
             PropertyChanges {
                 target: image
-                x: 523
-                y: 68
+                x: 772
+                y: 56
                 width: 235
                 height: 229
+            }
+
+            PropertyChanges {
+
+                target: customSlider
+                x: (parent.width - width) / 2  // This centers it horizontally
+                y: 311
+                width: 1103
+                height: 20
+                value: 0.5
+                anchors.horizontalCenterOffset: 0
+                transformOrigin: Item.Center
             }
         },
         State {
