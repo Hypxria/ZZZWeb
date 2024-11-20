@@ -83,6 +83,7 @@ Rectangle {
             height: 20
             visible: true
             value: controller.songPercent
+            live: true
             // Initial value (0.0 to 1.0)
 
             // Custom styling

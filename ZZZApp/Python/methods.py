@@ -50,7 +50,7 @@ class SpotifyController:
             
         except Exception as e:
             print(f"Error processing image: {str(e)}")
-            return "#0000FF"  # Return black as fallback
+            return "#000000"  # Return black as fallback
     
     def __init__(self, spotify: Spotify):
         # 
@@ -82,7 +82,7 @@ class SpotifyController:
         total_ms = current_track['item']['duration_ms']
         
         # Calculate percentage and round to 2 decimal places
-        percentage = round(progress_ms / total_ms, 2)
+        percentage = progress_ms / total_ms
         
         return percentage
     

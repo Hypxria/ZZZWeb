@@ -72,7 +72,7 @@ class InformationBinding(QObject):
     def _setupCoverTimer(self) -> None:
         # Setup timer for cover image updates
         self.coverTimer = QTimer(self)
-        self.coverTimer.setInterval(1000)  # Update every second
+        self.coverTimer.setInterval(50)  # Update every second
         self.coverTimer.timeout.connect(self.updateCover)
         self.coverTimer.start()
 
@@ -123,7 +123,7 @@ class InformationBinding(QObject):
             )
             return brighter_color.name(QColor.HexRgb)
         except:
-            return "#FF0000"  # Return white as fallback
+            return "#FFFFFF"  # Return white as fallback
 
     @songColorBright.setter
     def songColorBright(self, value: str) -> None:
@@ -188,6 +188,7 @@ class InformationBinding(QObject):
             newPercent = self._spotifyController.getPlaybackProgressPercentage()
             if newPercent != self._songPercent:
                 self.songPercent = newPercent
+                print(f"Progress updated to: {self._songPercent}%")
         except Exception as e:
             print(f"Error updating progress: {e}")
 
