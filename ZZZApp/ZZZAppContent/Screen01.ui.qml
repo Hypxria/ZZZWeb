@@ -51,8 +51,8 @@ Rectangle {
         Rectangle {
             id: coverImageContainer
             y: 0
-            width: 200
-            height: coverImageContainer.width
+            width: 235
+            height: 235
             visible: false
             color: "#762f2f"
             clip: true
@@ -72,6 +72,30 @@ Rectangle {
                 clip: false
                 anchors.horizontalCenter: parent.horizontalCenter
                 fillMode: Image.PreserveAspectFit
+            }
+
+            Text {
+                id: songTitle
+                y: 264
+                text: qsTr("Text")
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: -45
+                font.pixelSize: 12
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            Text {
+                id: creatorName
+                x: -532
+                y: -48
+                text: qsTr("Text")
+                font.pixelSize: 12
+            }
+
+            Text {
+                id: creationDate
+                text: qsTr("Text")
+                font.pixelSize: 12
             }
         }
 
@@ -250,23 +274,6 @@ Rectangle {
         }
     }
 
-    Image {
-        id: image1
-        x: 220
-        y: 163
-        width: 100
-        height: 100
-        visible: false
-        source: controller.songUrl
-        fillMode: Image.PreserveAspectFit
-        DesignEffect {
-            id: designEffect2
-            effects: [
-                DesignDropShadow {}
-            ]
-        }
-    }
-
     states: [
         State {
             name: "SpotifyMenu"
@@ -275,11 +282,12 @@ Rectangle {
             PropertyChanges {
                 target: coverImageContainer
                 x: 523
-                y: 56
-                width: 235
-                height: coverImageContainer.width
+                y: 48
+                width: 216
+                height: 216
                 visible: true
                 radius: 7
+                anchors.horizontalCenterOffset: -1
                 clip: false
             }
 
@@ -363,6 +371,23 @@ Rectangle {
             PropertyChanges {
                 target: rectangle
                 color: "#000000"
+            }
+
+            PropertyChanges {
+                target: songTitle
+                y: 220
+                color: "#ffffff"
+                text: qsTr("Weathergirl")
+                anchors.bottomMargin: -31
+                font.pixelSize: 19
+                font.family: "Verdana"
+                anchors.horizontalCenterOffset: 0
+            }
+
+            PropertyChanges {
+                target: baseMenu
+                y: -74
+                anchors.horizontalCenterOffset: 0
             }
         },
         State {
