@@ -7,10 +7,13 @@ this file manually, you might introduce QML code that is not supported by Qt Des
 Check out https://doc.qt.io/qtcreator/creator-quick-ui-forms.html for details on .ui.qml files.
 */
 import QtQuick 2.15
-import QtQuick.Controls
 import ZZZApp
 import QtQuick.Studio.Components 1.0
 import QtQuick.Studio.DesignEffects
+import QtQuick.Studio.Application
+import QtQuick.Layouts
+import QtQuick.Effects
+import QtQuick.Controls.Basic
 
 Rectangle {
     id: rectangle
@@ -21,17 +24,18 @@ Rectangle {
 
     GroupItem {
         id: musicMenu
-        y: 56
+        y: 0
         width: Constants.width
         height: Constants.height
+        anchors.horizontalCenterOffset: 0
         anchors.horizontalCenter: parent.horizontalCenter
 
         Image {
             id: image
-            x: 220
-            y: 163
-            width: 100
-            height: 100
+            x: 0
+            y: -3
+            width: 1280
+            height: 400
             visible: false
             source: controller.songUrl
             fillMode: Image.PreserveAspectFit
@@ -39,7 +43,7 @@ Rectangle {
             DesignEffect {
                 id: designEffect1
                 effects: [
-                    DesignDropShadow {}
+                    DesignInnerShadow {}
                 ]
             }
         }
@@ -51,15 +55,21 @@ Rectangle {
             height: coverImageContainer.width
             visible: false
             color: "#762f2f"
+            clip: true
             anchors.horizontalCenter: parent.horizontalCenter
 
             Image {
                 id: coverImage
+
+                x: 0
+                y: 26
+
                 width: 200
                 height: 200
                 visible: true
                 anchors.verticalCenter: parent.verticalCenter
                 source: controller.songUrl
+                clip: false
                 anchors.horizontalCenter: parent.horizontalCenter
                 fillMode: Image.PreserveAspectFit
             }
@@ -82,13 +92,13 @@ Rectangle {
                 width: customSlider.availableWidth
                 height: 4 // Height of the slider track
                 radius: 2
-                color: controller.songColorBright // Empty/background color
+                color: controller.songColorAvg // Empty/background color
 
                 // This is the filled portion
                 Rectangle {
                     width: customSlider.visualPosition * parent.width
                     height: parent.height
-                    color: controller.songColorAvg // Fill color
+                    color: controller.songColorBright // Fill color
                     radius: 2
                 }
             }
@@ -113,25 +123,25 @@ Rectangle {
             id: musicSelectionThing
             x: 482
             y: 290
-            width: 160
+            width: skipButton.x + skipButton.width
             height: 45
             visible: false
             layoutDirection: Qt.LeftToRight
 
             RoundButton {
-                id: roundButton
+                id: backButton
                 x: 617
                 text: "+"
             }
 
             RoundButton {
-                id: roundButton1
+                id: resumeButton
                 x: 673
                 text: "+"
             }
 
             RoundButton {
-                id: roundButton2
+                id: skipButton
                 x: 560
                 text: "+"
             }
@@ -237,10 +247,22 @@ Rectangle {
                 }
             }
         }
+    }
 
-        GroupItem {
-            x: 8
-            y: 72
+    Image {
+        id: image1
+        x: 220
+        y: 163
+        width: 100
+        height: 100
+        visible: false
+        source: controller.songUrl
+        fillMode: Image.PreserveAspectFit
+        DesignEffect {
+            id: designEffect2
+            effects: [
+                DesignDropShadow {}
+            ]
         }
     }
 
@@ -257,6 +279,7 @@ Rectangle {
                 height: coverImageContainer.width
                 visible: true
                 radius: 7
+                clip: false
             }
 
             PropertyChanges {
@@ -266,8 +289,14 @@ Rectangle {
                 y: 59
                 width: coverImageContainer.width
                 height: coverImageContainer.height
-
-                anchors.verticalCenterOffset: -1
+                visible: true
+                source: controller.songUrl
+                clip: false
+                baselineOffset: 0
+                enabled: true
+                smooth: true
+                antialiasing: true
+                anchors.verticalCenterOffset: 0
                 anchors.horizontalCenterOffset: 0
             }
 
@@ -287,11 +316,11 @@ Rectangle {
                 target: musicSelectionThing
                 x: (parent.width - width) / 2
                 y: 346
-                width: 148
+                width: skipButton.x + skipButton.width
                 height: 39
                 visible: true
                 anchors.horizontalCenterOffset: 5
-                spacing: 12
+                spacing: 50
             }
 
             PropertyChanges {
@@ -307,10 +336,10 @@ Rectangle {
                 target: image
                 x: 0
                 y: 0
-                width: 1281
+                width: 1280
                 height: 400
                 visible: true
-                scale: 3.476
+                scale: 1
                 rotation: 180
                 fillMode: Image.Stretch
             }
@@ -328,6 +357,11 @@ Rectangle {
             PropertyChanges {
                 target: propertyChanges
                 explicit: true
+            }
+
+            PropertyChanges {
+                target: rectangle
+                color: "#000000"
             }
         },
         State {

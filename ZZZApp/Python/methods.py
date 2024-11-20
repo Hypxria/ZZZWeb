@@ -5,6 +5,8 @@ import requests
 from io import BytesIO
 import numpy as np
 import json
+from PySide6.QtGui import QImage, QPainter, QPainterPath
+from PySide6.QtCore import Qt, QPoint
 
 # catching errors
 class InvalidSearchError(Exception):
@@ -23,7 +25,6 @@ class SpotifyController:
     # A controller class for interacting with the Spotify API.
     # This class provides methods for various Spotify operations such as
     # playing tracks, managing playlists, and controlling playback.
-    
     def get_average_hex_color(self, image_url):
         try:
             # Download image from URL
@@ -49,7 +50,7 @@ class SpotifyController:
             
         except Exception as e:
             print(f"Error processing image: {str(e)}")
-            return "#000000"  # Return black as fallback
+            return "#0000FF"  # Return black as fallback
     
     def __init__(self, spotify: Spotify):
         # 
