@@ -121,21 +121,21 @@ class SpotifyController:
         print(f"[bold green]Added '{track_name}' to playlist '{playlist_name}'.[/bold green]")
 
 
-        def get_current_song(self) -> str:
-                # 
-                # Retrieves information about the currently playing song.
+    def get_current_song(self) -> str:
+            # 
+            # Retrieves information about the currently playing song.
 
-                # Returns:
-                #     str: A string containing the track name and artist,
-                #          or a message if no track is playing.
-                # 
-                current_track = self.spotify.current_user_playing_track()
-                if current_track is not None and current_track['is_playing']:
-                    track_name = current_track['item']['name']
-                    artist_name = current_track['item']['artists'][0]['name']
-                    return f"{track_name} by {artist_name}"
-                else:
-                    return "No track is currently playing."
+            # Returns:
+            #     str: A string containing the track name and artist,
+            #          or a message if no track is playing.
+            # 
+            current_track = self.spotify.current_user_playing_track()
+            if current_track is not None and current_track['is_playing']:
+                track_name = current_track['item']['name']
+                artist_name = current_track['item']['artists'][0]['name']
+                return f"{track_name} by {artist_name}"
+            else:
+                return "No track is currently playing."
 
     def play_previous_song(self) -> None:
             # 
@@ -199,30 +199,6 @@ class SpotifyController:
             if not results["artists"]["items"]:
                 raise InvalidSearchError(f"No artist found with name: {name}")
             return results["artists"]["items"][0]["uri"]
-
-    def play_album(self, uri: str) -> None:
-            # 
-            # Plays an album from its Spotify URI.
-
-            # Args:
-            #     uri (str): The Spotify URI of the album to play.
-
-            # Returns:
-            #     None
-            # 
-            self.spotify.start_playback(context_uri=uri, device_id=self.default_device_id)
-
-    def play_track(self, uri: str) -> None:
-            # 
-            # Plays a track from its Spotify URI.
-
-            # Args:
-            #     uri (str): The Spotify URI of the track to play.
-
-            # Returns:
-            #     None
-            # 
-            self.spotify.start_playback(uris=[uri], device_id=self.default_device_id)
 
     def play_artist(self, uri: str) -> Spotify:
         # 
@@ -427,29 +403,6 @@ class SpotifyController:
         print(f"[bold green]Shuffle {'enabled' if state_bool else 'disabled'}.[/bold green]")
         return self.spotify
 
-    def get_user_followed_artists(self) -> list:
-        # 
-        # Retrieves a list of artists the user is following.
-
-        # Returns:
-        #     list: A list of names of artists the user is following.
-
-        # Note:
-        #     This method handles pagination to retrieve all followed artists.
-        # 
-        artists = []
-        results = self.spotify.current_user_followed_artists(limit=50)
-        
-        while results:
-            for item in results['artists']['items']:
-                artists.append(item['name'])
-            if results['artists']['next']:
-                results = self.spotify.next(results['artists'])
-            else:
-                results = None
-        
-        return artists
-
     def get_user_saved_tracks(self) -> list:
         # 
         # Retrieves a list of tracks saved in the user's library.
@@ -473,33 +426,6 @@ class SpotifyController:
                 results = None
         
         return tracks
-
-    def get_user_playlists(self) -> tuple[list, list]:
-        
-        # Retrieves a list of the user's playlists.
-
-        # Returns:
-        #     tuple[list, list]: A tuple containing two lists:
-        #         - The first list contains playlist names.
-        #         - The second list contains corresponding playlist IDs.
-
-        # Note:
-        #     This method handles pagination to retrieve all user playlists.
-        
-        playlists = []
-        playlist_ids = []
-        results = self.spotify.current_user_playlists(limit=50)
-        
-        while results:
-            for item in results['items']:
-                playlists.append(item['name'])
-                playlist_ids.append(item['id'])
-            if results['next']:
-                results = self.spotify.next(results)
-            else:
-                results = None
-        
-        return playlists, playlist_ids
 
     def init_default_device(self, local_device) -> str:
         # Initializes the default device for playback.

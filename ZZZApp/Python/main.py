@@ -170,8 +170,6 @@ class InformationBinding(QObject):
             if new_url != self._original_url:
                 self._original_url = new_url  # Store original URL
                 rounded_url = self._processAndRoundImage(new_url)
-                
-                
                 self.songUrl = rounded_url
                 # Update color using ORIGINAL URL, not the processed file URL
                 self._songColorAvg = self._spotifyController.get_average_hex_color(new_url)
