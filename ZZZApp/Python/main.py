@@ -39,7 +39,8 @@ sp = spotipy.Spotify(
 
 sp_controller = SpotifyController(sp)
 _utilities = utilityMethods()
-device_name = sp_controller.init_default_device(socket.gethostname().lower())
+sp_controller.init_default_device(socket.gethostname().lower())
+
 
 
 class InformationBinding(QObject):
@@ -50,6 +51,18 @@ class InformationBinding(QObject):
     songPercentChanged = Signal()
     songColorAvgChanged = Signal()
     songColorBrightChanged = Signal()
+    songTitleChanged = Signal()
+    songArtistChanged = Signal()
+    releaseYearChanged = Signal()
+    lyricsChanged = Signal()
+    currentTimeChanged = Signal()
+    currentLyricChanged = Signal()
+    nextLyricChanged = Signal()
+    previousLyricChanged = Signal()
+    
+    windowLoaded = Signal()
+
+
 
     def __init__(self, spotifyController):
         super().__init__()
@@ -61,35 +74,81 @@ class InformationBinding(QObject):
         self._songPercent = self._spotifyController.getPlaybackProgressPercentage()
         self._songColorAvg = self._spotifyController.get_average_hex_color(original_url)
         self._original_url = None  
+        self._songTitle = ""
+        self._songArtist = ""
+        self._releaseYear = ""
         
+        # Initialize lyrics state
+        self._currentLyric = ""
+        self._nextLyric = ""
+        self._previousLyric = ""
+        self._lyrics = []
+        self._current_track_id = None  # Add track ID tracking
+
+        # Timers
+        self._lyricTimer = QTimer(self)  # Pass self as parent
+        self._lyricTimer.setInterval(100)  # 100ms interval
+        self._lyricTimer.timeout.connect(self.updateLyricDisplay)
+        
+        self._songCheckTimer = QTimer(self)
+        self._songCheckTimer.setInterval(1000)  # Check every second
+        self._songCheckTimer.timeout.connect(self.checkSongChange)
+        self._songCheckTimer.start()
+        
+        QTimer.singleShot(100, self.windowLoaded.emit)
+
         self._setupTimers()
+
+    # Setup and preperation functions
 
     def _setupTimers(self) -> None:
         # Setup and start update timers
         self._setupCoverTimer()
         self._setupProgressTimer()
+        self._setupInformationTimer()
+        self._setupLyricsTimer()
 
     def _setupCoverTimer(self) -> None:
         # Setup timer for cover image updates
         self.coverTimer = QTimer(self)
-        self.coverTimer.setInterval(50)  # Update every second
+        self.coverTimer.setInterval(500)  # Update every second
         self.coverTimer.timeout.connect(self.updateCover)
         self.coverTimer.start()
 
     def _setupProgressTimer(self) -> None:
         # Setup timer for progress updates
         self.progressTimer = QTimer(self)
-        self.progressTimer.setInterval(50)  # Update every 50ms
+        self.progressTimer.setInterval(100)  # Update every 50ms
         self.progressTimer.timeout.connect(self.updateProgress)
         self.progressTimer.start()
+    
+    def _setupLyricsTimer(self) -> None:
+        # Setup timer for lyrics updates
+        self.lyricsTimer = QTimer(self)
+        self.lyricsTimer.setInterval(100)  # Update every second
+        self.lyricsTimer.timeout.connect(self.updateLyricDisplay)
+        self.lyricsTimer.start()
         
+        # Add song change check timer
+        self._songCheckTimer = QTimer(self)
+        self._songCheckTimer.setInterval(1000)  # Check every second
+        self._songCheckTimer.timeout.connect(self.checkSongChange)
+        self._songCheckTimer.start()
+    
+    def _setupInformationTimer(self) -> None:
+        # Set up timer for updating song information
+        self._infoTimer = QTimer()
+        self._infoTimer.setInterval(500)  # Update every second
+        self._infoTimer.timeout.connect(self.updateSongInformation)
+        self._infoTimer.start()
+    
     def _processAndRoundImage(self, url):
         if not url:
             return ""
         try:
             print("Starting image processing...")
             output_path = os.path.abspath(f"rounded_cover_{hash(url)}.png")
-            
+
             if url.startswith('file:///'):
                 print(f"Already a file URL, skipping: {url}")
                 return url
@@ -140,6 +199,37 @@ class InformationBinding(QObject):
         if self._songColorAvg != value:
             self._songColorAvg = value
             self.songColorAvgChanged.emit()
+            
+    # Song Information
+    @Property(str, notify=songTitleChanged)
+    def songTitle(self) -> str:
+        return self._songTitle
+
+    @songTitle.setter
+    def songTitle(self, value: str) -> None:
+        if self._songTitle != value:
+            self._songTitle = value
+            self.songTitleChanged.emit()
+
+    @Property(str, notify=songArtistChanged)
+    def songArtist(self) -> str:
+        return self._songArtist
+
+    @songArtist.setter
+    def songArtist(self, value: str) -> None:
+        if self._songArtist != value:
+            self._songArtist = value
+            self.songArtistChanged.emit()
+
+    @Property(str, notify=releaseYearChanged)
+    def releaseYear(self) -> str:
+        return self._releaseYear
+
+    @releaseYear.setter
+    def releaseYear(self, value: str) -> None:
+        if self._releaseYear != value:
+            self._releaseYear = value
+            self.releaseYearChanged.emit()
     
     @Property(str, notify=songUrlChanged)
     def songUrl(self) -> str:
@@ -161,6 +251,228 @@ class InformationBinding(QObject):
             self._songPercent = value
             self.songPercentChanged.emit()
 
+    @Property(list, notify=lyricsChanged)
+    def lyrics(self):
+        return self._lyrics
+        
+    @lyrics.setter
+    def lyrics(self, value):
+        if self._lyrics != value:
+            self._lyrics = value
+            self.lyricsChanged.emit()
+    
+    @Property(int, notify=currentTimeChanged)
+    def currentTime(self):
+        return self._currentTime
+        
+    @currentTime.setter
+    def currentTime(self, value):
+        if self._currentTime != value:
+            self._currentTime = value
+            self.currentTimeChanged.emit()
+    @Property(str, notify=currentLyricChanged)
+    def currentLyric(self):
+        return self._currentLyric
+
+    @currentLyric.setter
+    def currentLyric(self, value):
+        if self._currentLyric != value:
+            self._currentLyric = value
+            self.currentLyricChanged.emit()
+
+    @Property(str, notify=nextLyricChanged)
+    def nextLyric(self):
+        return self._nextLyric
+
+    @nextLyric.setter
+    def nextLyric(self, value):
+        if self._nextLyric != value:
+            self._nextLyric = value
+            self.nextLyricChanged.emit()
+
+    @Property(str, notify=previousLyricChanged)
+    def previousLyric(self):
+        return self._previousLyric
+
+    @previousLyric.setter
+    def previousLyric(self, value):
+        if self._previousLyric != value:
+            self._previousLyric = value
+            self.previousLyricChanged.emit()
+    
+    @Slot()
+    def checkSongChange(self):
+        """Check if the song has changed and reload lyrics if needed"""
+        try:
+            playback = self._spotifyController.spotify.current_playback()
+            if not playback or not playback.get('item'):
+                return
+
+            current_track_id = playback['item']['id']
+            
+            # If track has changed, reload lyrics
+            if current_track_id != self._current_track_id:
+                print("Song changed, reloading lyrics...")
+                self._current_track_id = current_track_id
+                self.loadLyrics()
+                
+        except Exception as e:
+            print(f"Error checking song change: {e}")
+
+
+    @Slot()
+    def updateSongInformation(self):
+        """Update current song information and check for song changes"""
+        try:
+            playback = self._spotifyController.spotify.current_playback()
+            if not playback or not playback.get('item'):
+                return
+
+            # Get current track info
+            current_track = playback['item']
+            current_track_id = current_track['id']
+            
+            # Update song title and artist
+            self.songTitle = current_track['name']
+            self.songArtist = current_track['artists'][0]['name']
+
+            # Check if song has changed
+            if current_track_id != self._current_track_id:
+                print(f"Song changed to: {self.songTitle} by {self.songArtist}")
+                self._current_track_id = current_track_id
+                
+                # Update cover image
+                self.updateCover()
+                
+                # Load new lyrics
+                self.loadLyrics()
+                
+                # Update progress
+                self.updateProgress()
+
+        except Exception as e:
+            print(f"Error updating song information: {e}")
+
+    
+    @Slot()
+    def updateLyricDisplay(self):
+        """Update the displayed lyrics based on current playback position"""
+        try:
+            playback = self._spotifyController.spotify.current_playback()
+            if not playback or not self._lyrics:
+                return
+
+            current_time = playback['progress_ms']
+            
+            # Find current lyric position
+            current_index = -1
+            for i, lyric in enumerate(self._lyrics):
+                if lyric['time'] <= current_time:
+                    current_index = i
+                else:
+                    break
+
+            if current_index >= 0:
+                # Set previous lyric
+                if current_index > 0:
+                    self.previousLyric = self._lyrics[current_index - 1]['words']
+                else:
+                    self.previousLyric = ""
+
+                # Set current lyric
+                self.currentLyric = self._lyrics[current_index]['words']
+
+                # Set next lyric
+                if current_index < len(self._lyrics) - 1:
+                    self.nextLyric = self._lyrics[current_index + 1]['words']
+                else:
+                    self.nextLyric = ""
+            else:
+                # Before first lyric
+                self.previousLyric = ""
+                self.currentLyric = self._lyrics[0]['words'] if self._lyrics else ""
+                self.nextLyric = self._lyrics[1]['words'] if len(self._lyrics) > 1 else ""
+
+        except Exception as e:
+            print(f"Error updating lyrics display: {e}")
+
+
+    
+    @Slot()
+    def loadLyrics(self):
+        """Load lyrics for current song"""
+        try:
+            lyrics_data = self._spotifyController.getLyrics()
+            if lyrics_data and lyrics_data.get('synced'):
+                self._lyrics = lyrics_data['synced']
+                self._lyricTimer.start()
+                # Reset lyrics display
+                self.previousLyric = ""
+                self.currentLyric = "Loading lyrics..."
+                self.nextLyric = ""
+            else:
+                self._lyrics = []
+                self._lyricTimer.stop()
+                self.previousLyric = ""
+                self.currentLyric = "No lyrics available"
+                self.nextLyric = ""
+        except Exception as e:
+            print(f"Error loading lyrics: {e}")
+            self.currentLyric = "Error loading lyrics"
+
+    def setSpotifyController(self, controller):
+        """Set the Spotify controller instance"""
+        self._spotifyController = controller
+        # Start the lyrics system
+        self.loadLyrics()
+
+
+    
+    # Value Updaters
+
+    @Slot()
+    def updateLyricDisplay(self):
+        """Update the displayed lyrics based on current playback position"""
+        try:
+            playback = self._spotifyController.spotify.current_playback()
+            if not playback or not self._lyrics:
+                return
+
+            current_time = playback['progress_ms']
+            
+            # Find current lyric position
+            current_index = -1
+            for i, lyric in enumerate(self._lyrics):
+                if lyric['time'] <= current_time:
+                    current_index = i
+                else:
+                    break
+
+            if current_index >= 0:
+                # Set previous lyric
+                if current_index > 0:
+                    self.previousLyric = self._lyrics[current_index - 1]['words']
+                else:
+                    self.previousLyric = ""
+
+                # Set current lyric
+                self.currentLyric = self._lyrics[current_index]['words']
+
+                # Set next lyric
+                if current_index < len(self._lyrics) - 1:
+                    self.nextLyric = self._lyrics[current_index + 1]['words']
+                else:
+                    self.nextLyric = ""
+            else:
+                # Before first lyric
+                self.previousLyric = ""
+                self.currentLyric = self._lyrics[0]['words'] if self._lyrics else ""
+                self.nextLyric = self._lyrics[1]['words'] if len(self._lyrics) > 1 else ""
+
+        except Exception as e:
+            print(f"Error updating lyrics display: {e}")
+
+
     @Slot()
     def updateCover(self) -> None:
         # Update the cover image URL from Spotify
@@ -171,6 +483,7 @@ class InformationBinding(QObject):
                 self._original_url = new_url  # Store original URL
                 rounded_url = self._processAndRoundImage(new_url)
                 self.songUrl = rounded_url
+
                 # Update color using ORIGINAL URL, not the processed file URL
                 self._songColorAvg = self._spotifyController.get_average_hex_color(new_url)
                 self.songColorAvgChanged.emit()
@@ -184,7 +497,7 @@ class InformationBinding(QObject):
         # Update the song progress from Spotify
         try:
             newPercent = self._spotifyController.getPlaybackProgressPercentage()
-            if newPercent != self._songPercent:
+            if newPercent != self._songPercent and newPercent != 0:
                 self.songPercent = newPercent
                 print(f"Progress updated to: {self._songPercent}%")
         except Exception as e:

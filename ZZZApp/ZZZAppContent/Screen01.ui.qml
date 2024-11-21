@@ -49,6 +49,26 @@ Rectangle {
         }
 
         Rectangle {
+            id: rectangle3
+            width: 200
+            height: 200
+            color: "#ffffff"
+        }
+
+        LyricsDisplay {
+            id: lyricsDisplay
+            x: 641
+            y: 162
+        }
+
+        Connections {
+            target: controller
+            function onWindowLoaded() {
+                controller.loadLyrics()
+            }
+        }
+
+        Rectangle {
             id: coverImageContainer
             y: 0
             width: 235
@@ -58,44 +78,47 @@ Rectangle {
             clip: true
             anchors.horizontalCenter: parent.horizontalCenter
 
-            Image {
-                id: coverImage
-
-                x: 0
-                y: 26
-
+            Rectangle {
+                id: rectangle2
+                x: -532
+                y: -48
                 width: 200
                 height: 200
-                visible: true
-                anchors.verticalCenter: parent.verticalCenter
-                source: controller.songUrl
-                clip: false
-                anchors.horizontalCenter: parent.horizontalCenter
-                fillMode: Image.PreserveAspectFit
+                color: "#ffffff"
             }
 
             Text {
                 id: songTitle
                 y: 264
-                text: qsTr("Text")
+                text: controller.songTitle
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: -45
                 font.pixelSize: 12
                 anchors.horizontalCenter: parent.horizontalCenter
-            }
 
-            Text {
-                id: creatorName
-                x: -532
-                y: -48
-                text: qsTr("Text")
-                font.pixelSize: 12
-            }
+                GroupItem {
+                    id: group
+                    y: -224
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: -30
+                    anchors.horizontalCenter: parent.horizontalCenter
 
-            Text {
-                id: creationDate
-                text: qsTr("Text")
-                font.pixelSize: 12
+                    Text {
+                        id: creatorName
+                        x: 28
+                        y: 251
+                        text: controller.songArtist
+                        font.pixelSize: 12
+
+                        Text {
+                            id: creationDate
+                            x: 159
+                            y: 224
+                            text: controller.releaseYear
+                            font.pixelSize: 12
+                        }
+                    }
+                }
             }
         }
 
@@ -285,28 +308,12 @@ Rectangle {
                 y: 48
                 width: 216
                 height: 216
+                opacity: 1
                 visible: true
+                color: "#00762f2f"
                 radius: 7
-                anchors.horizontalCenterOffset: -1
-                clip: false
-            }
-
-            PropertyChanges {
-                id: propertyChanges
-                target: coverImage
-                x: 523
-                y: 59
-                width: coverImageContainer.width
-                height: coverImageContainer.height
-                visible: true
-                source: controller.songUrl
-                clip: false
-                baselineOffset: 0
-                enabled: true
-                smooth: true
-                antialiasing: true
-                anchors.verticalCenterOffset: 0
                 anchors.horizontalCenterOffset: 0
+                clip: false
             }
 
             PropertyChanges {
@@ -336,7 +343,7 @@ Rectangle {
                 target: musicMenu
                 x: 89
                 y: 0
-                width: 1281
+                width: 1280
                 height: 400
                 anchors.horizontalCenterOffset: 0
             }
@@ -377,17 +384,66 @@ Rectangle {
                 target: songTitle
                 y: 220
                 color: "#ffffff"
-                text: qsTr("Weathergirl")
+                text: controller.songTitle
                 anchors.bottomMargin: -31
                 font.pixelSize: 19
-                font.family: "Verdana"
+                font.styleName: "Regular"
+                font.family: "Urbanist ExtraBold"
                 anchors.horizontalCenterOffset: 0
             }
 
             PropertyChanges {
-                target: baseMenu
-                y: -74
-                anchors.horizontalCenterOffset: 0
+                target: creationDate
+                x: creatorName.width
+                y: 0
+                color: "#ffffff"
+                text: controller.releaseYear
+                font.pixelSize: 16
+                font.family: "Urbanist"
+            }
+
+            PropertyChanges {
+                target: creatorName
+                x: 0
+                y: 0
+                color: "#ffffff"
+                text: `${controller.songArtist} • `
+                font.pixelSize: 16
+                font.family: "Urbanist"
+            }
+
+            PropertyChanges {
+                target: group
+                y: -224
+                width: creatorName.width + creationDate.width
+                height: 21
+                anchors.bottomMargin: -23
+            }
+
+            PropertyChanges {
+                target: rectangle2
+                x: 0
+                y: 4
+                opacity: 1
+                color: "#00ffffff"
+            }
+
+            PropertyChanges {
+                target: rectangle3
+                x: 0
+                y: 0
+                width: 1281
+                height: 400
+                opacity: 0.595
+                color: "#000000"
+            }
+
+            PropertyChanges {
+                target: lyricsDisplay
+                x: 540
+                y: 121
+                width: 200
+                height: 100
             }
         },
         State {

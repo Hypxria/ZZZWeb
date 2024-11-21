@@ -11,7 +11,7 @@ from PySide6.QtGui import QImage, QPainter, QPainterPath, Qt
 
 
 class utilityMethods:
-    def create_rounded_image_from_url(image_url, output_path, radius=7):
+    def create_rounded_image_from_url(image_url, output_path, radius=23):
         try:
             
             # If we get a file:/// URL, we need to convert it to a path

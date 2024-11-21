@@ -3,10 +3,12 @@ from spotipy import Spotify
 from PIL import Image
 import requests
 from io import BytesIO
-import numpy as np
 import json
-from PySide6.QtGui import QImage, QPainter, QPainterPath
-from PySide6.QtCore import Qt, QPoint
+import numpy as np
+from pathlib import Path
+from lrcup import LRCLib
+from typing import Optional, Dict, List, Union
+
 
 # catching errors
 class InvalidSearchError(Exception):
@@ -25,32 +27,7 @@ class SpotifyController:
     # A controller class for interacting with the Spotify API.
     # This class provides methods for various Spotify operations such as
     # playing tracks, managing playlists, and controlling playback.
-    def get_average_hex_color(self, image_url):
-        try:
-            # Download image from URL
-            response = requests.get(image_url)
-            img = Image.open(BytesIO(response.content))
-            
-            # Convert image to RGB if it isn't
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Convert to numpy array for faster processing
-            img_array = np.array(img)
-            
-            # Calculate average color
-            average_color = np.mean(img_array, axis=(0,1))
-            
-            # Convert to integers
-            r, g, b = [int(x) for x in average_color]
-            
-            # Convert to hex
-            hex_color = f"#{r:02x}{g:02x}{b:02x}"
-            return hex_color.upper()  # Return uppercase hex
-            
-        except Exception as e:
-            print(f"Error processing image: {str(e)}")
-            return "#000000"  # Return black as fallback
+    
     
     def __init__(self, spotify: Spotify):
         # 
@@ -63,8 +40,182 @@ class SpotifyController:
         #     spotify (Spotify): An authenticated Spotify client object.
         # 
         self.spotify = spotify
+        self.lyrics_cache = {}
+        self.lrclib = LRCLib()
         self.default_device_id = None
+        
+    def getLyrics(self) -> Optional[Dict[str, Union[List[Dict], str, None]]]:
+        try:
+            # Get current track info
+            current_track = self.spotify.current_playback()
+            if not current_track or not current_track.get('item'):
+                print("No track currently playing")
+                return None
+                
+            track_info = {
+                'name': current_track['item']['name'],
+                'artist': current_track['item']['artists'][0]['name'],
+                'duration': current_track['item']['duration_ms']
+            }
+            
+            # Check cache first
+            cache_key = f"{track_info['artist']} - {track_info['name']}"
+            if cache_key in self.lyrics_cache:
+                print("Found lyrics in cache")
+                return self.lyrics_cache[cache_key]
 
+            # Try sources in order of preference
+            lyrics = (
+                self._get_lrclib_lyrics(track_info) or
+                self._get_local_lyrics(track_info)
+            )
+            
+            if lyrics:
+                # Cache the result
+                self.lyrics_cache[cache_key] = lyrics
+                return lyrics
+                
+            print(f"No lyrics found for: {track_info['name']} by {track_info['artist']}")
+            return None
+            
+        except Exception as e:
+            print(f"Error in getLyrics: {e}")
+            return None
+
+    def _get_lrclib_lyrics(self, track_info: Dict) -> Optional[Dict]:
+        """Try to get synced lyrics from LRCLib"""
+        try:
+            results = self.lrclib.search(
+                track=track_info['name'],
+                artist=track_info['artist']
+            )
+            
+            if results and len(results) > 0:
+                synced_lyrics = results[0]["syncedLyrics"]
+                parsed_lyrics = []
+                
+                for line in synced_lyrics.split('\n'):
+                    if line.strip() and '[' in line:
+                        try:
+                            time_str = line[line.find('[')+1:line.find(']')]
+                            text = line[line.find(']')+1:].strip()
+                            
+                            # Convert time format [mm:ss.xx] to milliseconds
+                            mins, secs = time_str.split(':')
+                            time_ms = (int(mins) * 60 + float(secs)) * 1000
+                            
+                            parsed_lyrics.append({
+                                'time': int(time_ms),
+                                'words': text
+                            })
+                        except Exception as e:
+                            print(f"Error parsing line '{line}': {e}")
+                            continue
+                
+                if parsed_lyrics:
+                    print("Found lyrics in LRCLib")
+                    return {
+                        'synced': parsed_lyrics,
+                        'plain': '\n'.join(line['words'] for line in parsed_lyrics),
+                        'provider': 'LRCLib',
+                        'track_info': track_info
+                    }
+                    
+        except Exception as e:
+            print(f"LRCLib lyrics fetch failed: {e}")
+        return None
+    
+    def _get_local_lyrics(self, track_info: Dict) -> Optional[Dict]:
+        """Try to get lyrics from local storage"""
+        try:
+            lyrics_path = Path(__file__).parent / 'lyrics'
+            filename = f"{track_info['artist']} - {track_info['name']}.json"
+            lyrics_file = lyrics_path / filename.replace('/', '_')
+            
+            if lyrics_file.exists():
+                with open(lyrics_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return {
+                        'synced': data.get('synced'),
+                        'plain': data.get('plain'),
+                        'provider': 'Local',
+                        'track_info': track_info
+                    }
+                    
+        except Exception as e:
+            print(f"Local lyrics fetch failed: {e}")
+        return None
+            
+    def _get_fallback_lyrics(self, track_info: Dict) -> Optional[Dict]:
+        """Try to get unsynced lyrics from fallback sources"""
+        try:
+            # Example: Could implement other APIs here like Genius, Musixmatch, etc.
+            return None
+            
+        except Exception as e:
+            print(f"Fallback lyrics fetch failed: {e}")
+        return None
+            
+    def saveLyrics(self, lyrics_data: Dict) -> bool:
+        """
+        Save lyrics to local storage
+        
+        Args:
+            lyrics_data: Dictionary containing lyrics data
+        
+        Returns:
+            bool: True if saved successfully
+        """
+        try:
+            if not lyrics_data or 'track_info' not in lyrics_data:
+                return False
+                
+            lyrics_path = Path(__file__).parent / 'lyrics'
+            lyrics_path.mkdir(exist_ok=True)
+            
+            track_info = lyrics_data['track_info']
+            filename = f"{track_info['artist']} - {track_info['name']}.json"
+            lyrics_file = lyrics_path / filename.replace('/', '_')
+            
+            with open(lyrics_file, 'w', encoding='utf-8') as f:
+                json.dump(lyrics_data, f, ensure_ascii=False, indent=2)
+                
+            print(f"Lyrics saved to: {lyrics_file}")
+            return True
+            
+        except Exception as e:
+            print(f"Error saving lyrics: {e}")
+            return False
+
+
+
+    def get_average_hex_color(self, image_url):
+            try:
+                # Download image from URL
+                response = requests.get(image_url)
+                img = Image.open(BytesIO(response.content))
+                
+                # Convert image to RGB if it isn't
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Convert to numpy array for faster processing
+                img_array = np.array(img)
+                
+                # Calculate average color
+                average_color = np.mean(img_array, axis=(0,1))
+                
+                # Convert to integers
+                r, g, b = [int(x) for x in average_color]
+                
+                # Convert to hex
+                hex_color = f"#{r:02x}{g:02x}{b:02x}"
+                return hex_color.upper()  # Return uppercase hex
+                
+            except Exception as e:
+                print(f"Error processing image: {str(e)}")
+                return "#000000"  # Return black as fallback
+            
     def getPlaybackProgressPercentage(self) -> float:
         """
         Gets the current playback progress as a percentage.
@@ -86,6 +237,47 @@ class SpotifyController:
         
         return percentage
     
+    
+
+    def saveLyrics(self, lyrics: str, track_name: str = None, artist_name: str = None) -> bool:
+        """
+        Save lyrics to local storage for offline access
+        
+        Args:
+            lyrics: str - lyrics text to save
+            track_name: str - optional track name (uses current if None)
+            artist_name: str - optional artist name (uses current if None)
+        
+        Returns:
+            bool: True if saved successfully, False otherwise
+        """
+        try:
+            if not track_name or not artist_name:
+                current_track = self.spotify.current_playback()
+                if not current_track or not current_track.get('is_playing'):
+                    print("No track is currently playing.")
+                    return False
+            
+                track_name = current_track['item']['name']
+                artist_name = current_track['item']['artists'][0]['name']
+
+            lyrics_path = Path(__file__).parent / 'lyrics'
+            lyrics_path.mkdir(exist_ok=True)
+            
+            filename = f"{artist_name} - {track_name}.txt".replace('/', '_')
+            lyrics_file = lyrics_path / filename
+            
+            with open(lyrics_file, 'w', encoding='utf-8') as f:
+                f.write(lyrics)
+                
+            print(f"Lyrics saved to: {lyrics_file}")
+            return True
+            
+        except Exception as e:
+            print(f"Error saving lyrics: {e}")
+            return False
+
+
 
     def add_current_song_to_playlist(self, playlist_name: str) -> None:
         # 
@@ -121,21 +313,45 @@ class SpotifyController:
         print(f"[bold green]Added '{track_name}' to playlist '{playlist_name}'.[/bold green]")
 
 
-    def get_current_song(self) -> str:
-            # 
-            # Retrieves information about the currently playing song.
-
-            # Returns:
-            #     str: A string containing the track name and artist,
-            #          or a message if no track is playing.
-            # 
+    def getCurrentSongInfo(self) -> dict:
+        # Get current song information including title, artist, duration, and release year
+        
+        # Returns:
+        #     dict: A dictionary containing song details with the following keys:
+        #         - title: str
+        #         - artist: str
+        #         - duration: str (in MM:SS format)
+        #         - release_year: str
+        #         - is_playing: bool
+        #     Returns None if no song is playing or on error
+        try:
             current_track = self.spotify.current_user_playing_track()
-            if current_track is not None and current_track['is_playing']:
-                track_name = current_track['item']['name']
-                artist_name = current_track['item']['artists'][0]['name']
-                return f"{track_name} by {artist_name}"
-            else:
-                return "No track is currently playing."
+            
+            if current_track and current_track['item']:
+                track_item = current_track['item']
+                
+                # Calculate duration in minutes and seconds
+                duration_ms = track_item['duration_ms']
+                minutes = duration_ms // 60000  # Convert to minutes
+                seconds = (duration_ms % 60000) // 1000  # Remaining seconds
+                
+                song_info = {
+                    'title': track_item['name'],
+                    'artist': ", ".join([artist['name'] for artist in track_item['artists']]),
+                    'duration': f"{minutes}:{seconds:02d}",
+                    'release_year': track_item['album']['release_date'][:4],
+                    'is_playing': current_track['is_playing']
+                }
+                
+                return song_info
+                
+            return None
+            
+        except Exception as e:
+            print(f"[bold red]Error getting current song information: {e}[/bold red]")
+            return None
+
+
 
     def play_previous_song(self) -> None:
             # 
@@ -462,3 +678,4 @@ class SpotifyController:
                 print(device_name)
                 break 
         return device_name
+
