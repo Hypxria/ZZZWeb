@@ -34,13 +34,13 @@ sp = spotipy.Spotify(
         client_secret = SPOTIFY_CLIENT_SECRET,
         redirect_uri="http://localhost:8888/callback"
     ),
-    requests_timeout=300
+    requests_timeout=10
 )
 
 sp_controller = SpotifyController(sp)
-_utilities = utilityMethods()
+print('initing')
 sp_controller.init_default_device(socket.gethostname().lower())
-
+print('stuck?')
 
 
 class InformationBinding(QObject):
@@ -48,7 +48,7 @@ class InformationBinding(QObject):
     
     # Signal definitions
     songUrlChanged = Signal()
-    songPercentChanged = Signal()
+    songPercentChanged = Signal()   
     songColorAvgChanged = Signal()
     songColorBrightChanged = Signal()
     songTitleChanged = Signal()
@@ -237,7 +237,7 @@ class InformationBinding(QObject):
 
     @songUrl.setter
     def songUrl(self, value: str) -> None:
-        if self._songUrl != value:
+        if value and self._songUrl != value:
             self._songUrl = value
             self.songUrlChanged.emit()
 
@@ -485,7 +485,8 @@ class InformationBinding(QObject):
                 self.songUrl = rounded_url
 
                 # Update color using ORIGINAL URL, not the processed file URL
-                self._songColorAvg = self._spotifyController.get_average_hex_color(new_url)
+                if self._spotifyController.get_average_hex_color(new_url) != '':                    
+                    self._songColorAvg = self._spotifyController.get_average_hex_color(new_url)
                 self.songColorAvgChanged.emit()
                 self.songColorBrightChanged.emit()
                 
@@ -499,7 +500,7 @@ class InformationBinding(QObject):
             newPercent = self._spotifyController.getPlaybackProgressPercentage()
             if newPercent != self._songPercent and newPercent != 0:
                 self.songPercent = newPercent
-                print(f"Progress updated to: {self._songPercent}%")
+                print(f"Progress updated to: {self._songPercent * 100}%")
         except Exception as e:
             print(f"Error updating progress: {e}")
 
@@ -533,6 +534,7 @@ if __name__ == '__main__':
     app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
     
+    print('here?')
     # First create the Spotify controller
     sp = spotipy.Spotify(
         auth_manager=SpotifyOAuth(
@@ -541,7 +543,7 @@ if __name__ == '__main__':
             client_secret=SPOTIFY_CLIENT_SECRET,
             redirect_uri="http://localhost:8888/callback"
         ),
-        requests_timeout=300
+        requests_timeout=10
     )
     
     sp_controller = SpotifyController(sp)

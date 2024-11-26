@@ -19,46 +19,52 @@ Rectangle {
     id: rectangle
     width: Constants.width
     height: Constants.height
-
-    color: Constants.backgroundColor
+    color: "#ffffff"
 
     GroupItem {
         id: musicMenu
         y: 0
-        width: Constants.width
+        width: 640
         height: Constants.height
-        anchors.horizontalCenterOffset: 0
-        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.left: parent.left
+        anchors.leftMargin: 0
+        transformOrigin: Item.Left
+
+        Rectangle {
+            id: rectangle3
+            x: 0
+            y: 0
+            width: 640
+            height: 400
+            visible: true
+            color: "#000000"
+        }
 
         Image {
-            id: image
+            id: imageBG
             x: 0
-            y: -3
-            width: 1280
+            y: 0
+            width: 640
             height: 400
-            visible: false
-            source: controller.songUrl
+            visible: true
+            transformOrigin: Item.Left
             fillMode: Image.PreserveAspectFit
 
             DesignEffect {
                 id: designEffect1
-                effects: [
-                    DesignInnerShadow {}
-                ]
+                layerBlurRadius: 100
             }
-        }
-
-        Rectangle {
-            id: rectangle3
-            width: 200
-            height: 200
-            color: "#ffffff"
         }
 
         LyricsDisplay {
             id: lyricsDisplay
-            x: 641
-            y: 162
+            width: 200
+            height: 200
+            visible: false
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -306
+            anchors.horizontalCenterOffset: 418
+            anchors.horizontalCenter: parent.horizontalCenter
         }
 
         Connections {
@@ -70,63 +76,82 @@ Rectangle {
 
         Rectangle {
             id: coverImageContainer
-            y: 0
             width: 235
             height: 235
-            visible: false
+            opacity: 0
+            visible: true
             color: "#762f2f"
-            clip: true
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -36
+            anchors.horizontalCenterOffset: 0
+            clip: false
             anchors.horizontalCenter: parent.horizontalCenter
 
             Rectangle {
                 id: rectangle2
-                x: -532
-                y: -48
-                width: 200
-                height: 200
+                y: 0
+                width: 235
+                height: 235
+                visible: true
                 color: "#ffffff"
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: 0
+                anchors.bottomMargin: 0
+
+                Image {
+                    id: image1
+                    width: 235
+                    height: 235
+                    visible: true
+                    anchors.verticalCenter: parent.verticalCenter
+                    source: controller.songUrl
+                    anchors.verticalCenterOffset: 0
+                    anchors.horizontalCenterOffset: 0
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    fillMode: Image.PreserveAspectFit
+                }
             }
 
             Text {
                 id: songTitle
-                y: 264
+                x: (parent.width - width) / 2
+                y: 237
+                visible: true
                 text: controller.songTitle
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: -45
+                anchors.bottomMargin: -22
                 font.pixelSize: 12
-                anchors.horizontalCenter: parent.horizontalCenter
+                horizontalAlignment: Text.AlignHCenter
+            }
 
-                GroupItem {
-                    id: group
-                    y: -224
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: -30
-                    anchors.horizontalCenter: parent.horizontalCenter
+            Text {
+                id: creatorName
+                x: 3
+                y: 241
+                visible: true
+                text: controller.songArtist
+                anchors.left: parent.left
+                anchors.top: coverImageContainer.bottom
+                anchors.leftMargin: 593
+                anchors.topMargin: 179
+                font.pixelSize: 12
 
-                    Text {
-                        id: creatorName
-                        x: 28
-                        y: 251
-                        text: controller.songArtist
-                        font.pixelSize: 12
-
-                        Text {
-                            id: creationDate
-                            x: 159
-                            y: 224
-                            text: controller.releaseYear
-                            font.pixelSize: 12
-                        }
-                    }
+                Text {
+                    id: creationDate
+                    x: parent.width
+                    visible: true
+                    text: controller.releaseYear
+                    font.pixelSize: 12
                 }
             }
         }
 
         Slider {
             id: customSlider
-            x: 0
-            y: 264
-            width: 200
+            x: 44
+            y: 320
+            width: 551
             height: 20
             visible: true
             value: controller.songPercent
@@ -169,11 +194,14 @@ Rectangle {
 
         Row {
             id: musicSelectionThing
-            x: 482
-            y: 290
             width: skipButton.x + skipButton.width
             height: 45
-            visible: false
+            visible: true
+            anchors.top: customSlider.bottom
+            anchors.topMargin: -2
+            anchors.horizontalCenterOffset: 0
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 25
             layoutDirection: Qt.LeftToRight
 
             RoundButton {
@@ -299,33 +327,32 @@ Rectangle {
 
     states: [
         State {
-            name: "SpotifyMenu"
+            name: "SpotifyMenuLyrics"
             when: roundButtonSpotify.checked
 
             PropertyChanges {
                 target: coverImageContainer
                 x: 523
-                y: 48
+                y: 63
                 width: 216
                 height: 216
                 opacity: 1
                 visible: true
                 color: "#00762f2f"
                 radius: 7
-                anchors.horizontalCenterOffset: 0
                 clip: false
+                anchors.horizontalCenterOffset: -438
             }
 
             PropertyChanges {
-
                 target: customSlider
-                x: (parent.width - width) / 2 // This centers it horizontally
+                x: (parent.width - width) / 2
                 y: 320
                 width: 1103
                 height: 20
                 value: controller.songPercent
-                anchors.horizontalCenterOffset: 0
                 transformOrigin: Item.Center
+                anchors.horizontalCenterOffset: 0
             }
 
             PropertyChanges {
@@ -335,8 +362,8 @@ Rectangle {
                 width: skipButton.x + skipButton.width
                 height: 39
                 visible: true
-                anchors.horizontalCenterOffset: 5
                 spacing: 50
+                anchors.horizontalCenterOffset: 5
             }
 
             PropertyChanges {
@@ -349,9 +376,11 @@ Rectangle {
             }
 
             PropertyChanges {
-                target: image
-                x: 0
+                target: imageBG
+                x: 1280
                 y: 0
+                source: controller.songUrl
+                transformOrigin: Item.Left
                 width: 1280
                 height: 400
                 visible: true
@@ -371,25 +400,23 @@ Rectangle {
             }
 
             PropertyChanges {
-                target: propertyChanges
-                explicit: true
-            }
-
-            PropertyChanges {
                 target: rectangle
                 color: "#000000"
             }
 
             PropertyChanges {
                 target: songTitle
-                y: 220
+                x: image1.x
+                y: 210
                 color: "#ffffff"
                 text: controller.songTitle
-                anchors.bottomMargin: -31
+                anchors.bottomMargin: -24
                 font.pixelSize: 19
+                horizontalAlignment: Text.AlignLeft
+                transformOrigin: Item.Left
                 font.styleName: "Regular"
                 font.family: "Urbanist ExtraBold"
-                anchors.horizontalCenterOffset: 0
+                anchors.horizontalCenterOffset: -11
             }
 
             PropertyChanges {
@@ -404,26 +431,22 @@ Rectangle {
 
             PropertyChanges {
                 target: creatorName
-                x: 0
-                y: 0
+                x: 100
+                y: 304
                 color: "#ffffff"
-                text: `${controller.songArtist} • `
+                anchors.leftMargin: 0
+                anchors.rightMargin: 0
+                anchors.topMargin: 24
+                anchors.bottomMargin: 76
                 font.pixelSize: 16
+                transformOrigin: Item.Left
                 font.family: "Urbanist"
-            }
-
-            PropertyChanges {
-                target: group
-                y: -224
-                width: creatorName.width + creationDate.width
-                height: 21
-                anchors.bottomMargin: -23
             }
 
             PropertyChanges {
                 target: rectangle2
                 x: 0
-                y: 4
+                y: 16
                 opacity: 1
                 color: "#00ffffff"
             }
@@ -435,17 +458,29 @@ Rectangle {
                 width: 1281
                 height: 400
                 opacity: 0.595
+                visible: false
                 color: "#000000"
             }
 
             PropertyChanges {
                 target: lyricsDisplay
-                x: 540
+                x: 639
                 y: 121
                 width: 200
                 height: 100
+                visible: true
+            }
+
+            PropertyChanges {
+                target: image1
+                x: 0
+                y: 0
+                width: parent.width
+                height: parent.height
+                transformOrigin: Item.Left
             }
         },
+
         State {
             name: "ZenlessMenu"
             when: roundButtonZenless.checked

@@ -214,7 +214,7 @@ class SpotifyController:
                 
             except Exception as e:
                 print(f"Error processing image: {str(e)}")
-                return "#000000"  # Return black as fallback
+                
             
     def getPlaybackProgressPercentage(self) -> float:
         """
@@ -655,14 +655,17 @@ class SpotifyController:
         # Note:
         #     This method searches for available devices and sets the default device
         #     based on the provided local device information.
+        print('methods line 659')
         results = self.spotify.devices()
-
+        print('methods line 659')
+        
+        
         device_name = None
         for device in results["devices"]:
             if device["name"].lower() == local_device:
                 self.default_device_id = device["id"]
                 device_name = device["name"]
-                #print("Default device detected: " + device_name)
+                print("Default device detected: " + device_name)
                 break
             else:
                 print("Default device not found, pick one from these")
