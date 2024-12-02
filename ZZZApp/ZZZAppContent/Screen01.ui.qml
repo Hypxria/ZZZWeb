@@ -30,6 +30,38 @@ Rectangle {
         anchors.leftMargin: 0
         transformOrigin: Item.Left
 
+        Image {
+            id: imageBGSmall
+            x: 0
+            y: 0
+            width: 640
+            height: 400
+            visible: true
+            source: controller.songUrl
+            transformOrigin: Item.Center
+            fillMode: Image.PreserveAspectFit
+            DesignEffect {
+                id: designEffect2
+                layerBlurRadius: 100
+            }
+        }
+
+        Image {
+            id: imageBGFull
+            x: 0
+            y: 0
+            width: 1281
+            height: 400
+            visible: false
+            transformOrigin: Item.Center
+            fillMode: Image.PreserveAspectFit
+
+            DesignEffect {
+                id: designEffect1
+                layerBlurRadius: 100
+            }
+        }
+
         Rectangle {
             id: rectangle3
             x: 0
@@ -38,22 +70,6 @@ Rectangle {
             height: 400
             visible: true
             color: "#000000"
-        }
-
-        Image {
-            id: imageBG
-            x: 0
-            y: 0
-            width: 640
-            height: 400
-            visible: true
-            transformOrigin: Item.Left
-            fillMode: Image.PreserveAspectFit
-
-            DesignEffect {
-                id: designEffect1
-                layerBlurRadius: 100
-            }
         }
 
         LyricsDisplay {
@@ -340,6 +356,7 @@ Rectangle {
                 visible: true
                 color: "#00762f2f"
                 radius: 7
+                anchors.verticalCenterOffset: -29
                 clip: false
                 anchors.horizontalCenterOffset: -438
             }
@@ -376,11 +393,11 @@ Rectangle {
             }
 
             PropertyChanges {
-                target: imageBG
-                x: 1280
+                target: imageBGFull
+                x: 0
                 y: 0
                 source: controller.songUrl
-                transformOrigin: Item.Left
+                transformOrigin: Item.Center
                 width: 1280
                 height: 400
                 visible: true
@@ -448,7 +465,8 @@ Rectangle {
                 x: 0
                 y: 16
                 opacity: 1
-                color: "#00ffffff"
+                color: "#ffffff"
+                radius: 10
             }
 
             PropertyChanges {
@@ -458,7 +476,7 @@ Rectangle {
                 width: 1281
                 height: 400
                 opacity: 0.595
-                visible: false
+                visible: true
                 color: "#000000"
             }
 
@@ -469,6 +487,8 @@ Rectangle {
                 width: 200
                 height: 100
                 visible: true
+                anchors.verticalCenterOffset: -36
+                anchors.horizontalCenterOffset: 106
             }
 
             PropertyChanges {
@@ -477,7 +497,13 @@ Rectangle {
                 y: 0
                 width: parent.width
                 height: parent.height
+                scale: 1
                 transformOrigin: Item.Left
+            }
+
+            PropertyChanges {
+                target: imageBGSmall
+                visible: false
             }
         },
 

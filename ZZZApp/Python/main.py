@@ -3,7 +3,8 @@ import sys
 import dotenv
 from pathlib import Path
 import socket
-from PySide6.QtCore import QObject, Slot, Property, Signal, QTimer
+from PySide6.QtCore import QObject, Slot, Property, Signal, QTimer, QThread
+from concurrent.futures import ThreadPoolExecutor
 from PySide6.QtGui import QGuiApplication, QColor
 from PySide6.QtQml import QQmlApplicationEngine
 from autogen.settings import url, import_paths
@@ -11,6 +12,12 @@ from spotipy.oauth2 import SpotifyOAuth
 import spotipy
 from methods import *
 from UtilityMethods import *
+
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 
 dotenv.load_dotenv()
@@ -38,9 +45,53 @@ sp = spotipy.Spotify(
 )
 
 sp_controller = SpotifyController(sp)
-print('initing')
-sp_controller.init_default_device(socket.gethostname().lower())
-print('stuck?')
+
+class ImageProcessor(QThread):
+    finished = Signal(str, str)
+    
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        self._spotifyController = sp_controller
+        self._image_processor = None
+
+        
+    def run(self):
+        # Update the cover image URL from Spotify
+        try:
+            new_url = self._spotifyController.getCoverImage()
+            # Only process if the original URL changed
+            if new_url != self.url:
+                rounded_url = self._processAndRoundImage(new_url)
+                self.finished.emit(rounded_url, new_url)                    
+        except Exception as e:
+            print(f"Error updating cover: {e}") 
+            
+    def _processAndRoundImage(self, url):
+        if not url:
+            return ""
+        try:
+            print("Starting image processing...")
+            output_path = os.path.abspath(f"rounded_cover_{hash(url)}.png")
+            
+            if url.startswith('file:///'):
+                print(f"Already a file URL, skipping: {url}")
+                return url
+                
+            print(f"Processing URL: {url}")
+            rounded_url = utilityMethods.create_rounded_image_from_url(url, output_path)
+            
+            if rounded_url is None:
+                print(f"Failed to process image, falling back to original URL: {url}")
+                return url
+                
+            file_url = QUrl.fromLocalFile(rounded_url).toString()
+            print(f"Final file URL: {file_url}")
+            return file_url
+            
+        except Exception as e:
+            print(f"Error in _process_and_round_image: {e}")
+            return url
 
 
 class InformationBinding(QObject):
@@ -66,6 +117,7 @@ class InformationBinding(QObject):
 
     def __init__(self, spotifyController):
         super().__init__()
+        
         self._spotifyController = spotifyController
         
         # Initialize state values
@@ -77,6 +129,10 @@ class InformationBinding(QObject):
         self._songTitle = ""
         self._songArtist = ""
         self._releaseYear = ""
+        self._image_processor = None
+        
+        # Start Debug Mode
+        self._debug = False
         
         # Initialize lyrics state
         self._currentLyric = ""
@@ -105,20 +161,24 @@ class InformationBinding(QObject):
         # Setup and start update timers
         self._setupCoverTimer()
         self._setupProgressTimer()
-        self._setupInformationTimer()
         self._setupLyricsTimer()
+        self._setupInformationTimer()
+        # Create image processor
+        self._imageProcessor = ImageProcessor(self._spotifyController)
+        self._imageProcessor.finished.connect(self._onCoverProcessed)
+        
 
     def _setupCoverTimer(self) -> None:
         # Setup timer for cover image updates
         self.coverTimer = QTimer(self)
-        self.coverTimer.setInterval(500)  # Update every second
-        self.coverTimer.timeout.connect(self.updateCover)
+        self.coverTimer.setInterval(1000)  # Update every second
+        self.coverTimer.timeout.connect(self._updateCover)
         self.coverTimer.start()
 
     def _setupProgressTimer(self) -> None:
         # Setup timer for progress updates
         self.progressTimer = QTimer(self)
-        self.progressTimer.setInterval(100)  # Update every 50ms
+        self.progressTimer.setInterval(500)  # Update every 50ms
         self.progressTimer.timeout.connect(self.updateProgress)
         self.progressTimer.start()
     
@@ -131,14 +191,14 @@ class InformationBinding(QObject):
         
         # Add song change check timer
         self._songCheckTimer = QTimer(self)
-        self._songCheckTimer.setInterval(1000)  # Check every second
+        self._songCheckTimer.setInterval(2000)  # Check every second
         self._songCheckTimer.timeout.connect(self.checkSongChange)
         self._songCheckTimer.start()
     
     def _setupInformationTimer(self) -> None:
         # Set up timer for updating song information
         self._infoTimer = QTimer()
-        self._infoTimer.setInterval(500)  # Update every second
+        self._infoTimer.setInterval(1000)  # Update every second
         self._infoTimer.timeout.connect(self.updateSongInformation)
         self._infoTimer.start()
     
@@ -168,6 +228,19 @@ class InformationBinding(QObject):
             print(f"Error in _process_and_round_image: {e}")
             return url
     
+    def _onCoverProcessed(self, processed_url, original_url):
+        try:
+            self.songUrl = processed_url
+            self._original_url = original_url
+            
+            # Update color using original URL
+            if self._spotifyController.get_average_hex_color(original_url) != '':
+                self._songColorAvg = self._spotifyController.get_average_hex_color(original_url)
+                self.songColorAvgChanged.emit()
+                self.songColorBrightChanged.emit()
+        except Exception as e:
+            print(f"Error updating cover: {e}")
+
     # Spotify Properties
     @Property(str, notify=songColorBrightChanged)
     def songColorBright(self) -> str:
@@ -342,7 +415,7 @@ class InformationBinding(QObject):
                 self._current_track_id = current_track_id
                 
                 # Update cover image
-                self.updateCover()
+                self._updateCover()
                 
                 # Load new lyrics
                 self.loadLyrics()
@@ -474,24 +547,34 @@ class InformationBinding(QObject):
 
 
     @Slot()
-    def updateCover(self) -> None:
-        # Update the cover image URL from Spotify
+    def _updateCover(self):
         try:
             new_url = self._spotifyController.getCoverImage()
-            # Only process if the original URL changed
             if new_url != self._original_url:
-                self._original_url = new_url  # Store original URL
-                rounded_url = self._processAndRoundImage(new_url)
-                self.songUrl = rounded_url
-
-                # Update color using ORIGINAL URL, not the processed file URL
-                if self._spotifyController.get_average_hex_color(new_url) != '':                    
-                    self._songColorAvg = self._spotifyController.get_average_hex_color(new_url)
-                self.songColorAvgChanged.emit()
-                self.songColorBrightChanged.emit()
-                
+                # Clean up completed threads
+                print("Before processor check")  # Debug print
+                if self._image_processor is not None:
+                    print('Cleaning up old processor')
+                    self._image_processor.quit()
+                    self._image_processor.wait()
+                    self._image_processor.deleteLater()
+                print('Creating new processor')
+                # Create new processor
+                self._image_processor = ImageProcessor(self._original_url)
+                self._image_processor.finished.connect(self._onCoverProcessed)
+                self._image_processor.start()
+                print('post2')
         except Exception as e:
-            print(f"Error updating cover: {e}") 
+            print(f"Error in _updateCover: {e}")
+            print(f"Error location: {e.__traceback__.tb_lineno}")
+
+
+    def _cleanup_processor(self, processor):
+        if processor in self._image_processor:
+            processor.quit()
+            processor.wait()
+            self._image_processor.remove(processor)
+            processor.deleteLater()
 
     @Slot()
     def updateProgress(self) -> None:
@@ -500,7 +583,8 @@ class InformationBinding(QObject):
             newPercent = self._spotifyController.getPlaybackProgressPercentage()
             if newPercent != self._songPercent and newPercent != 0:
                 self.songPercent = newPercent
-                print(f"Progress updated to: {self._songPercent * 100}%")
+                if self._debug:
+                    print(f"Progress updated to: {self._songPercent * 100}%")
         except Exception as e:
             print(f"Error updating progress: {e}")
 
@@ -509,6 +593,21 @@ class InformationBinding(QObject):
         self.coverTimer.stop()
         self.progressTimer.stop()
         
+        if hasattr(self, '_imageProcessor'):
+            self._imageProcessor.quit()
+            self._imageProcessor.wait()
+        
+        if hasattr(self, 'coverTimer'):
+            self.coverTimer.stop()
+
+        for processor in self._image_processor:
+            processor.quit()
+            processor.wait()
+            processor.deleteLater()
+            self._image_processor.clear()
+            self._image_processor = None
+
+
         # Clean up rounded image cache
         try:
             cache_pattern = "rounded_cover_*.png"
@@ -524,11 +623,6 @@ class InformationBinding(QObject):
                     
         except Exception as e:
             print(f"Error during cache cleanup: {e}")
-
-
-
-
-
 
 if __name__ == '__main__':
     app = QGuiApplication(sys.argv)
@@ -546,8 +640,15 @@ if __name__ == '__main__':
         requests_timeout=10
     )
     
+    logger.debug("Starting lyric display update")
     sp_controller = SpotifyController(sp)
-    device_name = sp_controller.init_default_device(socket.gethostname().lower())
+    try:
+        sp_controller.init_default_device(socket.gethostname().lower())
+        logger.debug("Completed lyric display update")
+    except Exception as e:
+        logger.error(f"Error updating lyrics display: {e}", exc_info=True)
+
+
     
     # Then pass it to InformationBinding
     controller = InformationBinding(sp_controller)
