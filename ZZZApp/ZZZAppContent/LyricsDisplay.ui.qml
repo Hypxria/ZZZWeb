@@ -27,6 +27,7 @@ Rectangle {
             font.pixelSize: 24
             font.bold: true
             horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
             text: controller.currentLyric
 
             Behavior on text {
@@ -35,7 +36,7 @@ Rectangle {
                     property: "opacity"
                     from: 0.5
                     to: 1.0
-                    duration: 200
+                    duration: 250
                 }
             }
         }

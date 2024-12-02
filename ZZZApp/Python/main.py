@@ -1,29 +1,33 @@
 import os
 import sys
-import dotenv
 from pathlib import Path
+import dotenv
 import socket
 from PySide6.QtCore import QObject, Slot, Property, Signal, QTimer, QThread
-from concurrent.futures import ThreadPoolExecutor
 from PySide6.QtGui import QGuiApplication, QColor
 from PySide6.QtQml import QQmlApplicationEngine
 from autogen.settings import url, import_paths
 from spotipy.oauth2 import SpotifyOAuth
 import spotipy
+
+import time
+import threading
+from typing import Optional, Callable
+import logging
+
 from methods import *
 from UtilityMethods import *
 
-import logging
+debug = False
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-
+if debug:
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger(__name__)
 
 dotenv.load_dotenv()
+
 SPOTIFY_CLIENT_ID = os.getenv("CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-
 SPOTIFY_SCOPES = [
     "ugc-image-upload", "user-read-playback-state", "user-modify-playback-state",
     "user-follow-modify", "user-read-private", "user-follow-read", "user-library-modify",
@@ -46,6 +50,55 @@ sp = spotipy.Spotify(
 
 sp_controller = SpotifyController(sp)
 
+class SpotifyEventListener(threading.Thread):
+    def __init__(self, spotify, callback: Callable, interval: float = 1.0):
+        super().__init__()
+        self.spotify = spotify
+        self.callback = callback
+        self.interval = interval
+        self.last_playback_state: Optional[dict] = None
+        self._running = True
+        self.daemon = True  # Thread will exit when main program exits
+
+    def run(self):
+        while self._running:
+            try:
+                current_playback = self.spotify.current_playback()
+                
+                if current_playback != self.last_playback_state:
+                    # Check specific changes we care about
+                    if self._has_relevant_changes(current_playback):
+                        self.callback(current_playback)
+                    
+                self.last_playback_state = current_playback
+                
+            except Exception as e:
+                print(f"Error in event listener: {e}")
+            
+            time.sleep(self.interval)
+
+    def _has_relevant_changes(self, current_playback: Optional[dict]) -> bool:
+        if not current_playback or not self.last_playback_state:
+            return True
+
+        # Check for track change
+        current_track = current_playback.get('item', {}).get('id')
+        last_track = self.last_playback_state.get('item', {}).get('id')
+        if current_track != last_track:
+            return True
+
+        # Check for playback state change (playing/paused)
+        current_playing = current_playback.get('is_playing')
+        last_playing = self.last_playback_state.get('is_playing')
+        if current_playing != last_playing:
+            return True
+
+        return False
+
+    def stop(self):
+        self._running = False
+
+
 class ImageProcessor(QThread):
     finished = Signal(str, str)
     
@@ -54,6 +107,7 @@ class ImageProcessor(QThread):
         self.url = url
         self._spotifyController = sp_controller
         self._image_processor = None
+        
 
         
     def run(self):
@@ -129,7 +183,12 @@ class InformationBinding(QObject):
         self._songTitle = ""
         self._songArtist = ""
         self._releaseYear = ""
+        
         self._image_processor = None
+        
+        self._event_listener = None
+        self.start_event_listener()
+
         
         # Start Debug Mode
         self._debug = False
@@ -140,67 +199,89 @@ class InformationBinding(QObject):
         self._previousLyric = ""
         self._lyrics = []
         self._current_track_id = None  # Add track ID tracking
-
-        # Timers
-        self._lyricTimer = QTimer(self)  # Pass self as parent
-        self._lyricTimer.setInterval(100)  # 100ms interval
-        self._lyricTimer.timeout.connect(self.updateLyricDisplay)
-        
-        self._songCheckTimer = QTimer(self)
-        self._songCheckTimer.setInterval(1000)  # Check every second
-        self._songCheckTimer.timeout.connect(self.checkSongChange)
-        self._songCheckTimer.start()
         
         QTimer.singleShot(100, self.windowLoaded.emit)
 
         self._setupTimers()
 
     # Setup and preperation functions
+    
+    def start_event_listener(self):
+        self._event_listener = SpotifyEventListener(
+            self._spotifyController.spotify,
+            self._handle_playback_event
+        )
+        self._event_listener.start()
+    
+    def _handle_playback_event(self, playback_state):
+        """Handle playback state changes"""
+        if not playback_state:
+            return
+
+        try:
+            current_track = playback_state.get('item', {})
+            if not current_track:
+                return
+
+            track_id = current_track.get('id')
+            if track_id != self._current_track_id:
+                # Track changed
+                self._current_track_id = track_id
+                
+                # Update song information
+                self.songTitle = current_track.get('name', '')
+                artists = current_track.get('artists', [])
+                self.songArtist = artists[0].get('name', '') if artists else ''
+
+                # Update cover
+                self._updateCover()
+                
+                # Load new lyrics
+                self.loadLyrics()
+
+            # Update playback progress
+            self.updateProgress()
+
+        except Exception as e:
+            print(f"Error handling playback event: {e}")
+
 
     def _setupTimers(self) -> None:
         # Setup and start update timers
-        self._setupCoverTimer()
         self._setupProgressTimer()
         self._setupLyricsTimer()
-        self._setupInformationTimer()
+        
+
         # Create image processor
         self._imageProcessor = ImageProcessor(self._spotifyController)
         self._imageProcessor.finished.connect(self._onCoverProcessed)
-        
-
-    def _setupCoverTimer(self) -> None:
-        # Setup timer for cover image updates
-        self.coverTimer = QTimer(self)
-        self.coverTimer.setInterval(1000)  # Update every second
-        self.coverTimer.timeout.connect(self._updateCover)
-        self.coverTimer.start()
 
     def _setupProgressTimer(self) -> None:
         # Setup timer for progress updates
+        self._progressThread = QThread()
+        # Thread New
+
         self.progressTimer = QTimer(self)
         self.progressTimer.setInterval(500)  # Update every 50ms
         self.progressTimer.timeout.connect(self.updateProgress)
         self.progressTimer.start()
+
+        self._progressThread.started.connect(self.progressTimer.start)
+        self._progressThread.finished.connect(self.progressTimer.stop)
     
     def _setupLyricsTimer(self) -> None:
         # Setup timer for lyrics updates
+        self._lyricsThread = QThread()
+        # Thread New
+        
         self.lyricsTimer = QTimer(self)
         self.lyricsTimer.setInterval(100)  # Update every second
         self.lyricsTimer.timeout.connect(self.updateLyricDisplay)
         self.lyricsTimer.start()
         
-        # Add song change check timer
-        self._songCheckTimer = QTimer(self)
-        self._songCheckTimer.setInterval(2000)  # Check every second
-        self._songCheckTimer.timeout.connect(self.checkSongChange)
-        self._songCheckTimer.start()
-    
-    def _setupInformationTimer(self) -> None:
-        # Set up timer for updating song information
-        self._infoTimer = QTimer()
-        self._infoTimer.setInterval(1000)  # Update every second
-        self._infoTimer.timeout.connect(self.updateSongInformation)
-        self._infoTimer.start()
+        self._lyricsThread.started.connect(self.lyricsTimer.start)
+        self._lyricsThread.finished.connect(self.lyricsTimer.stop)
+
     
     def _processAndRoundImage(self, url):
         if not url:
@@ -372,7 +453,9 @@ class InformationBinding(QObject):
         if self._previousLyric != value:
             self._previousLyric = value
             self.previousLyricChanged.emit()
+            
     
+    # Modifier Functions
     @Slot()
     def checkSongChange(self):
         """Check if the song has changed and reload lyrics if needed"""
@@ -426,7 +509,41 @@ class InformationBinding(QObject):
         except Exception as e:
             print(f"Error updating song information: {e}")
 
+    @Slot()
+    def pauseResume(self):
+        """Pause or resume playback"""
+        try:
+            playback = self._spotifyController.spotify.current_playback()
+            if not playback:
+                return
+
+            if playback['is_playing']:
+                self._spotifyController.spotify.pause_playback()
+            else:
+                self._spotifyController.spotify.start_playback()
+
+        except Exception as e:
+            print(f"Error pausing/resuming playback: {e}")
     
+    @Slot()
+    def backSong(self):
+        """Go back to the previous song"""
+        try:
+            progress = self._spotifyController.spotify.current_playback()['progress_ms']
+            if progress['progress_ms'] > 3000:
+                self._spotifyController.spotify.seek_track(0)
+            self._spotifyController.spotify.previous_track()
+        except Exception as e:
+            print(f"Error going back to previous song: {e}")
+    
+    @Slot()
+    def frontSong(self):
+        """Skip to the next song"""
+        try:
+            self._spotifyController.spotify.next_track()
+        except Exception as e:
+            print(f"Error skipping to next song: {e}")
+            
     @Slot()
     def updateLyricDisplay(self):
         """Update the displayed lyrics based on current playback position"""
@@ -478,14 +595,19 @@ class InformationBinding(QObject):
             lyrics_data = self._spotifyController.getLyrics()
             if lyrics_data and lyrics_data.get('synced'):
                 self._lyrics = lyrics_data['synced']
-                self._lyricTimer.start()
+                
                 # Reset lyrics display
+                if hasattr(self, '_lyricTimer') and not self._lyricTimer.isActive():
+                    self._lyricTimer.start()
+                    
+                #reset lyrics
                 self.previousLyric = ""
                 self.currentLyric = "Loading lyrics..."
                 self.nextLyric = ""
             else:
                 self._lyrics = []
-                self._lyricTimer.stop()
+                if hasattr(self, '_lyricTimer'):
+                    self._lyricTimer.stop()
                 self.previousLyric = ""
                 self.currentLyric = "No lyrics available"
                 self.nextLyric = ""
@@ -580,6 +702,8 @@ class InformationBinding(QObject):
     def updateProgress(self) -> None:
         # Update the song progress from Spotify
         try:
+            if hasattr(self, '_lyricTimer') and not self._lyricTimer.isActive():
+                self._lyricTimer.start()
             newPercent = self._spotifyController.getPlaybackProgressPercentage()
             if newPercent != self._songPercent and newPercent != 0:
                 self.songPercent = newPercent
@@ -590,22 +714,20 @@ class InformationBinding(QObject):
 
     def cleanup(self) -> None:
     # Stop timers first
-        self.coverTimer.stop()
-        self.progressTimer.stop()
         
         if hasattr(self, '_imageProcessor'):
             self._imageProcessor.quit()
             self._imageProcessor.wait()
         
-        if hasattr(self, 'coverTimer'):
-            self.coverTimer.stop()
-
-        for processor in self._image_processor:
-            processor.quit()
-            processor.wait()
-            processor.deleteLater()
-            self._image_processor.clear()
-            self._image_processor = None
+        if hasattr(self, '_lyricsThread'):
+            self._lyricsThread.quit()
+            self._lyricsThread.wait()
+        
+        if hasattr(self, '_progressThread'):
+            self._progressThread.quit()
+            self._progressThread.wait()
+            
+        self._image_processor = None
 
 
         # Clean up rounded image cache
@@ -640,14 +762,17 @@ if __name__ == '__main__':
         requests_timeout=10
     )
     
-    logger.debug("Starting lyric display update")
-    sp_controller = SpotifyController(sp)
-    try:
+    if debug:
+        logger.debug("Starting lyric display update")
+        sp_controller = SpotifyController(sp)
+        try:
+            sp_controller.init_default_device(socket.gethostname().lower())
+            logger.debug("Completed lyric display update")
+        except Exception as e:
+            logger.error(f"Error updating lyrics display: {e}", exc_info=True)
+    else:
+        sp_controller = SpotifyController(sp)
         sp_controller.init_default_device(socket.gethostname().lower())
-        logger.debug("Completed lyric display update")
-    except Exception as e:
-        logger.error(f"Error updating lyrics display: {e}", exc_info=True)
-
 
     
     # Then pass it to InformationBinding

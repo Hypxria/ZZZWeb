@@ -351,8 +351,6 @@ class SpotifyController:
             print(f"[bold red]Error getting current song information: {e}[/bold red]")
             return None
 
-
-
     def play_previous_song(self) -> None:
             # 
             # Plays the previous song in the queue.

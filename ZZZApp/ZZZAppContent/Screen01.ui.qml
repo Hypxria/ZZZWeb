@@ -30,6 +30,16 @@ Rectangle {
         anchors.leftMargin: 0
         transformOrigin: Item.Left
 
+        Rectangle {
+            id: rectangle3
+            x: 0
+            y: 0
+            width: 640
+            height: 400
+            visible: true
+            color: "#000000"
+        }
+
         Image {
             id: imageBGSmall
             x: 0
@@ -39,7 +49,7 @@ Rectangle {
             visible: true
             source: controller.songUrl
             transformOrigin: Item.Center
-            fillMode: Image.PreserveAspectFit
+            fillMode: Image.Stretch
             DesignEffect {
                 id: designEffect2
                 layerBlurRadius: 100
@@ -60,16 +70,6 @@ Rectangle {
                 id: designEffect1
                 layerBlurRadius: 100
             }
-        }
-
-        Rectangle {
-            id: rectangle3
-            x: 0
-            y: 0
-            width: 640
-            height: 400
-            visible: true
-            color: "#000000"
         }
 
         LyricsDisplay {
@@ -224,18 +224,33 @@ Rectangle {
                 id: backButton
                 x: 617
                 text: "+"
+
+                Connections {
+                    target: backButton
+                    onClicked: controller.backSong()
+                }
             }
 
             RoundButton {
                 id: resumeButton
                 x: 673
                 text: "+"
+
+                Connections {
+                    target: resumeButton
+                    onClicked: controller.pauseResume()
+                }
             }
 
             RoundButton {
                 id: skipButton
                 x: 560
                 text: "+"
+
+                Connections {
+                    target: skipButton
+                    onClicked: controller.frontSong()
+                }
             }
         }
     }
@@ -484,7 +499,7 @@ Rectangle {
                 target: lyricsDisplay
                 x: 639
                 y: 121
-                width: 200
+                width: 972
                 height: 100
                 visible: true
                 anchors.verticalCenterOffset: -36
