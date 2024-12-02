@@ -3,9 +3,13 @@ import sys
 from pathlib import Path
 import dotenv
 import socket
-from PySide6.QtCore import QObject, Slot, Property, Signal, QTimer, QThread
+import asyncio
+from qasync import QEventLoop, asyncSlot, asyncClose
+
+from PySide6.QtCore import QObject, Slot, Property, Signal, QTimer, QThread, QEvent
 from PySide6.QtGui import QGuiApplication, QColor
 from PySide6.QtQml import QQmlApplicationEngine
+
 from autogen.settings import url, import_paths
 from spotipy.oauth2 import SpotifyOAuth
 import spotipy
@@ -49,6 +53,41 @@ sp = spotipy.Spotify(
 )
 
 sp_controller = SpotifyController(sp)
+
+
+class WindowEventFilter(QObject):
+    def __init__(self, information_binding):
+        super().__init__()
+        self._information_binding = information_binding
+        self._move_timer = QTimer()
+        self._move_timer.setSingleShot(True)
+        self._move_timer.timeout.connect(self._on_move_finished)
+        
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Move:
+            # Window is being moved
+            if not hasattr(self._information_binding, '_is_moving'):
+                self._information_binding._is_moving = True
+                # Pause updates during movement
+                if hasattr(self._information_binding, '_lyricTimer'):
+                    self._information_binding._lyricTimer.stop()
+                if hasattr(self._information_binding, 'progressTimer'):
+                    self._information_binding.progressTimer.stop()
+            
+            # Restart the timer each time we move
+            self._move_timer.start(100)
+            
+        return super().eventFilter(obj, event)
+    
+    def _on_move_finished(self):
+        # Movement has stopped
+        self._information_binding._is_moving = False
+        # Resume updates
+        if hasattr(self._information_binding, '_lyricTimer'):
+            self._information_binding._lyricTimer.start()
+        if hasattr(self._information_binding, 'progressTimer'):
+            self._information_binding.progressTimer.start()
+
 
 class SpotifyEventListener(threading.Thread):
     def __init__(self, spotify, callback: Callable, interval: float = 1.0):
@@ -120,7 +159,7 @@ class ImageProcessor(QThread):
                 self.finished.emit(rounded_url, new_url)                    
         except Exception as e:
             print(f"Error updating cover: {e}") 
-            
+    
     def _processAndRoundImage(self, url):
         if not url:
             return ""
@@ -174,6 +213,16 @@ class InformationBinding(QObject):
         
         self._spotifyController = spotifyController
         
+        # For optimization
+        self._is_moving = False
+        self._move_timer = QTimer()
+        self._move_timer.setSingleShot(True)
+        self._move_timer.timeout.connect(self._onMoveFinished)
+        
+        # Reduce update frequency
+        self._update_throttle = {}
+
+        
         # Initialize state values
         original_url = self._spotifyController.getCoverImage()
         self._songUrl = self._processAndRoundImage(original_url)
@@ -205,6 +254,33 @@ class InformationBinding(QObject):
         self._setupTimers()
 
     # Setup and preperation functions
+    
+    def moveStarted(self):
+        """Call this when window starts moving"""
+        self._is_moving = True
+        # Pause non-essential updates
+        if hasattr(self, '_lyricTimer'):
+            self._lyricTimer.stop()
+        
+    def moveStopped(self):
+        """Call this when window stops moving"""
+        # Don't immediately resume - wait a short moment
+        self._move_timer.start(100)  # 100ms delay
+        
+    def _onMoveFinished(self):
+        self._is_moving = False
+        # Resume updates
+        if hasattr(self, '_lyricTimer'):
+            self._lyricTimer.start()
+            
+    def _throttle(self, key, interval):
+        """Helper to throttle frequent updates"""
+        now = time.time()
+        if key in self._update_throttle:
+            if now - self._update_throttle[key] < interval:
+                return True
+        self._update_throttle[key] = now
+        return False
     
     def start_event_listener(self):
         self._event_listener = SpotifyEventListener(
@@ -275,7 +351,7 @@ class InformationBinding(QObject):
         # Thread New
         
         self.lyricsTimer = QTimer(self)
-        self.lyricsTimer.setInterval(100)  # Update every second
+        self.lyricsTimer.setInterval(500)  # Update every second
         self.lyricsTimer.timeout.connect(self.updateLyricDisplay)
         self.lyricsTimer.start()
         
@@ -545,53 +621,17 @@ class InformationBinding(QObject):
             print(f"Error skipping to next song: {e}")
             
     @Slot()
-    def updateLyricDisplay(self):
-        """Update the displayed lyrics based on current playback position"""
+    def loadLyrics(self):
+        if self._is_moving:
+            return
+            
+        # Throttle updates
+        if self._throttle('lyrics', 0.1):  # 100ms minimum between updates
+            return
+            
         try:
             playback = self._spotifyController.spotify.current_playback()
-            if not playback or not self._lyrics:
-                return
 
-            current_time = playback['progress_ms']
-            
-            # Find current lyric position
-            current_index = -1
-            for i, lyric in enumerate(self._lyrics):
-                if lyric['time'] <= current_time:
-                    current_index = i
-                else:
-                    break
-
-            if current_index >= 0:
-                # Set previous lyric
-                if current_index > 0:
-                    self.previousLyric = self._lyrics[current_index - 1]['words']
-                else:
-                    self.previousLyric = ""
-
-                # Set current lyric
-                self.currentLyric = self._lyrics[current_index]['words']
-
-                # Set next lyric
-                if current_index < len(self._lyrics) - 1:
-                    self.nextLyric = self._lyrics[current_index + 1]['words']
-                else:
-                    self.nextLyric = ""
-            else:
-                # Before first lyric
-                self.previousLyric = ""
-                self.currentLyric = self._lyrics[0]['words'] if self._lyrics else ""
-                self.nextLyric = self._lyrics[1]['words'] if len(self._lyrics) > 1 else ""
-
-        except Exception as e:
-            print(f"Error updating lyrics display: {e}")
-
-
-    
-    @Slot()
-    def loadLyrics(self):
-        """Load lyrics for current song"""
-        try:
             lyrics_data = self._spotifyController.getLyrics()
             if lyrics_data and lyrics_data.get('synced'):
                 self._lyrics = lyrics_data['synced']
@@ -629,6 +669,9 @@ class InformationBinding(QObject):
     def updateLyricDisplay(self):
         """Update the displayed lyrics based on current playback position"""
         try:
+            if hasattr(self, '_is_moving') and self._is_moving:
+                print('"Skipping lyric update due to slider movement." (self._is_moving')
+                return
             playback = self._spotifyController.spotify.current_playback()
             if not playback or not self._lyrics:
                 return
@@ -671,6 +714,8 @@ class InformationBinding(QObject):
     @Slot()
     def _updateCover(self):
         try:
+            if hasattr(self, '_is_moving') and self._is_moving:
+                return
             new_url = self._spotifyController.getCoverImage()
             if new_url != self._original_url:
                 # Clean up completed threads
@@ -702,6 +747,8 @@ class InformationBinding(QObject):
     def updateProgress(self) -> None:
         # Update the song progress from Spotify
         try:
+            if hasattr(self, '_is_moving') and self._is_moving:
+                return
             if hasattr(self, '_lyricTimer') and not self._lyricTimer.isActive():
                 self._lyricTimer.start()
             newPercent = self._spotifyController.getPlaybackProgressPercentage()
@@ -778,6 +825,8 @@ if __name__ == '__main__':
     # Then pass it to InformationBinding
     controller = InformationBinding(sp_controller)
     engine.rootContext().setContextProperty("controller", controller)
+    
+    event_filter = WindowEventFilter(controller)
 
     app.aboutToQuit.connect(controller.cleanup)
 
@@ -788,6 +837,10 @@ if __name__ == '__main__':
         engine.addImportPath(os.fspath(app_dir / path))
 
     engine.load(os.fspath(app_dir/url))
+    if engine.rootObjects():
+        root_window = engine.rootObjects()[0]
+        root_window.installEventFilter(event_filter)
+    
     if not engine.rootObjects():
         sys.exit(-1)
     sys.exit(app.exec())

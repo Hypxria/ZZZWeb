@@ -30,16 +30,6 @@ Rectangle {
         anchors.leftMargin: 0
         transformOrigin: Item.Left
 
-        Rectangle {
-            id: rectangle3
-            x: 0
-            y: 0
-            width: 640
-            height: 400
-            visible: true
-            color: "#000000"
-        }
-
         Image {
             id: imageBGSmall
             x: 0
@@ -70,6 +60,16 @@ Rectangle {
                 id: designEffect1
                 layerBlurRadius: 100
             }
+        }
+
+        Rectangle {
+            id: rectangle3
+            x: 0
+            y: 0
+            width: 640
+            height: 400
+            visible: true
+            color: "#000000"
         }
 
         LyricsDisplay {
