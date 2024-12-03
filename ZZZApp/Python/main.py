@@ -3,8 +3,6 @@ import sys
 from pathlib import Path
 import dotenv
 import socket
-import asyncio
-from qasync import QEventLoop, asyncSlot, asyncClose
 
 from PySide6.QtCore import QObject, Slot, Property, Signal, QTimer, QThread, QEvent
 from PySide6.QtGui import QGuiApplication, QColor
@@ -105,8 +103,15 @@ class SpotifyEventListener(threading.Thread):
                 current_playback = self.spotify.current_playback()
                 
                 if current_playback != self.last_playback_state:
-                    # Check specific changes we care about
                     if self._has_relevant_changes(current_playback):
+                        # Get additional track details including release date
+                        if current_playback and current_playback.get('item'):
+                            track_id = current_playback['item']['id']
+                            track_details = self.spotify.track(track_id)
+                            # Add release date to playback info
+                            current_playback['track_details'] = {
+                                'release_date': track_details['album']['release_date']
+                            }
                         self.callback(current_playback)
                     
                 self.last_playback_state = current_playback
@@ -115,6 +120,7 @@ class SpotifyEventListener(threading.Thread):
                 print(f"Error in event listener: {e}")
             
             time.sleep(self.interval)
+
 
     def _has_relevant_changes(self, current_playback: Optional[dict]) -> bool:
         if not current_playback or not self.last_playback_state:
@@ -161,7 +167,9 @@ class ImageProcessor(QThread):
             print(f"Error updating cover: {e}") 
     
     def _processAndRoundImage(self, url):
-        if not url:
+        if not url:    
+            default_image_path = os.path.abspath("default_cover.png")
+            print(f"Using default image: {default_image_path}")
             return ""
         try:
             print("Starting image processing...")
@@ -172,7 +180,7 @@ class ImageProcessor(QThread):
                 return url
                 
             print(f"Processing URL: {url}")
-            rounded_url = utilityMethods.create_rounded_image_from_url(url, output_path)
+            rounded_url = utilityMethods.create_rounded_image_from_url(url, output_path)  
             
             if rounded_url is None:
                 print(f"Failed to process image, falling back to original URL: {url}")
@@ -306,8 +314,14 @@ class InformationBinding(QObject):
                 
                 # Update song information
                 self.songTitle = current_track.get('name', '')
+                print(self.songTitle)   
                 artists = current_track.get('artists', [])
                 self.songArtist = artists[0].get('name', '') if artists else ''
+                
+                album = current_track.get('album', {})
+                self.releaseYear = album.get('release_date', '')
+                self.releaseYear = self.releaseYear.split('-')[0] if self.releaseYear else ''
+                print(self.releaseYear)
 
                 # Update cover
                 self._updateCover()

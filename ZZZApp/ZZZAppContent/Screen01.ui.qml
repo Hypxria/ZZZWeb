@@ -38,6 +38,8 @@ Rectangle {
             height: 400
             visible: true
             source: controller.songUrl
+            rotation: 180
+            mirror: true
             transformOrigin: Item.Center
             fillMode: Image.Stretch
             DesignEffect {
@@ -68,6 +70,7 @@ Rectangle {
             y: 0
             width: 640
             height: 400
+            opacity: 0.6
             visible: true
             color: "#000000"
         }
@@ -94,11 +97,11 @@ Rectangle {
             id: coverImageContainer
             width: 235
             height: 235
-            opacity: 0
+            opacity: 1
             visible: true
             color: "#762f2f"
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: -36
+            anchors.verticalCenterOffset: -31
             anchors.horizontalCenterOffset: 0
             clip: false
             anchors.horizontalCenter: parent.horizontalCenter
@@ -110,6 +113,7 @@ Rectangle {
                 height: 235
                 visible: true
                 color: "#ffffff"
+                radius: 10
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
                 anchors.leftMargin: 0
@@ -134,31 +138,66 @@ Rectangle {
                 x: (parent.width - width) / 2
                 y: 237
                 visible: true
+                color: "#ffffff"
                 text: controller.songTitle
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: -22
-                font.pixelSize: 12
+                anchors.bottomMargin: -21
+                font.pixelSize: 15
                 horizontalAlignment: Text.AlignHCenter
+                font.family: "Urbanist ExtraBold"
+            }
+
+            GroupItem {
+                id: group
+                width: creatorNameBaseState.width + creationDateBaseState.width
+                height: creatorNameBaseState.height
+                anchors.top: creatorName.top
+                anchors.topMargin: -1
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                Text {
+                    id: creatorNameBaseState
+                    x: 0
+                    y: 0
+                    visible: true
+                    color: "#ffffff"
+                    text: controller.songArtist + ' · '
+                    anchors.top: coverImageContainer.bottom
+                    anchors.topMargin: 20
+                    font.pixelSize: 14
+                    font.family: "Urbanist"
+                    Text {
+                        id: creationDateBaseState
+                        x: parent.width
+                        visible: true
+                        color: "#ffffff"
+                        text: controller.releaseYear
+                        font.pixelSize: 14
+                        font.family: "Urbanist"
+                    }
+                }
             }
 
             Text {
                 id: creatorName
-                x: 3
+                x: 0
                 y: 241
-                visible: true
-                text: controller.songArtist
+                visible: false
+                text: controller.songArtist + ' · '
                 anchors.left: parent.left
                 anchors.top: coverImageContainer.bottom
-                anchors.leftMargin: 593
-                anchors.topMargin: 179
-                font.pixelSize: 12
+                anchors.leftMargin: -38
+                anchors.topMargin: 20
+                font.pixelSize: 14
+                font.family: "Urbanist"
 
                 Text {
                     id: creationDate
                     x: parent.width
                     visible: true
                     text: controller.releaseYear
-                    font.pixelSize: 12
+                    font.pixelSize: 14
+                    font.family: "Urbanist ExtraBold"
                 }
             }
         }
@@ -201,6 +240,7 @@ Rectangle {
                 width: 16
                 height: 16
                 opacity: 1
+                visible: false
                 radius: 8
                 color: customSlider.pressed ? "#f0f0f0" : "#ffffff"
                 border.color: "#1db954"
@@ -465,6 +505,7 @@ Rectangle {
                 target: creatorName
                 x: 100
                 y: 304
+                visible: true
                 color: "#ffffff"
                 anchors.leftMargin: 0
                 anchors.rightMargin: 0
@@ -490,7 +531,7 @@ Rectangle {
                 y: 0
                 width: 1281
                 height: 400
-                opacity: 0.595
+                opacity: 0.6
                 visible: true
                 color: "#000000"
             }
@@ -499,7 +540,7 @@ Rectangle {
                 target: lyricsDisplay
                 x: 639
                 y: 121
-                width: 972
+                width: 784
                 height: 100
                 visible: true
                 anchors.verticalCenterOffset: -36
@@ -518,6 +559,11 @@ Rectangle {
 
             PropertyChanges {
                 target: imageBGSmall
+                visible: false
+            }
+
+            PropertyChanges {
+                target: creatorNameBaseState
                 visible: false
             }
         },
