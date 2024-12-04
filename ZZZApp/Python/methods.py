@@ -1,6 +1,8 @@
 from rich import print
 from spotipy import Spotify
 from PIL import Image
+import aiohttp
+import asyncio
 import requests
 from io import BytesIO
 import json
@@ -14,7 +16,7 @@ from typing import Optional, Dict, List, Union
 class InvalidSearchError(Exception):
     pass
 
-def exit_application() -> None:
+async def exit_application() -> None:
     
     # Exits the application
     
@@ -43,8 +45,27 @@ class SpotifyController:
         self.lyrics_cache = {}
         self.lrclib = LRCLib()
         self.default_device_id = None
-        
-    def getLyrics(self) -> Optional[Dict[str, Union[List[Dict], str, None]]]:
+    
+    async def setup(self):
+        """Async initialization method"""
+        print("Running setup method")  
+        self.session = aiohttp.ClientSession()
+        # Initialize any other async components here
+        try:
+            # Test the connection
+            self.spotify.current_playback()
+        except Exception as e:
+            print(f"Error during setup: {e}")
+        return self
+
+    async def cleanup(self):
+        """Cleanup method to close the session"""
+        if self.session:
+            print('closing')
+            await self.session.close()
+
+    
+    async def getLyrics(self) -> Optional[Dict[str, Union[List[Dict], str, None]]]:
         try:
             # Get current track info
             current_track = self.spotify.current_playback()
@@ -82,7 +103,7 @@ class SpotifyController:
             print(f"Error in getLyrics: {e}")
             return None
 
-    def _get_lrclib_lyrics(self, track_info: Dict) -> Optional[Dict]:
+    async def _get_lrclib_lyrics(self, track_info: Dict) -> Optional[Dict]:
         """Try to get synced lyrics from LRCLib"""
         try:
             results = self.lrclib.search(
@@ -125,7 +146,7 @@ class SpotifyController:
             print(f"LRCLib lyrics fetch failed: {e}")
         return None
     
-    def _get_local_lyrics(self, track_info: Dict) -> Optional[Dict]:
+    async def _get_local_lyrics(self, track_info: Dict) -> Optional[Dict]:
         """Try to get lyrics from local storage"""
         try:
             lyrics_path = Path(__file__).parent / 'lyrics'
@@ -146,7 +167,7 @@ class SpotifyController:
             print(f"Local lyrics fetch failed: {e}")
         return None
             
-    def _get_fallback_lyrics(self, track_info: Dict) -> Optional[Dict]:
+    async def _get_fallback_lyrics(self, track_info: Dict) -> Optional[Dict]:
         """Try to get unsynced lyrics from fallback sources"""
         try:
             # Example: Could implement other APIs here like Genius, Musixmatch, etc.
@@ -156,7 +177,7 @@ class SpotifyController:
             print(f"Fallback lyrics fetch failed: {e}")
         return None
             
-    def saveLyrics(self, lyrics_data: Dict) -> bool:
+    async def saveLyrics(self, lyrics_data: Dict) -> bool:
         """
         Save lyrics to local storage
         
@@ -189,7 +210,7 @@ class SpotifyController:
 
 
 
-    def get_average_hex_color(self, image_url):
+    async def get_average_hex_color(self, image_url):
             try:
                 # Download image from URL
                 response = requests.get(image_url)
@@ -216,7 +237,7 @@ class SpotifyController:
                 print(f"Error processing image: {str(e)}")
                 
             
-    def getPlaybackProgressPercentage(self) -> float:
+    async def getPlaybackProgressPercentage(self) -> float:
         """
         Gets the current playback progress as a percentage.
     
@@ -239,7 +260,7 @@ class SpotifyController:
     
     
 
-    def saveLyrics(self, lyrics: str, track_name: str = None, artist_name: str = None) -> bool:
+    async def saveLyrics(self, lyrics: str, track_name: str = None, artist_name: str = None) -> bool:
         """
         Save lyrics to local storage for offline access
         
@@ -279,7 +300,7 @@ class SpotifyController:
 
 
 
-    def add_current_song_to_playlist(self, playlist_name: str) -> None:
+    async def add_current_song_to_playlist(self, playlist_name: str) -> None:
         # 
         # Adds the currently playing song to the specified playlist.
 
@@ -312,8 +333,21 @@ class SpotifyController:
         self.spotify.user_playlist_add_tracks(self.spotify.me()['id'], target_playlist['id'], [track_uri])
         print(f"[bold green]Added '{track_name}' to playlist '{playlist_name}'.[/bold green]")
 
+    async def getCurrentPlayback(self):
+        """Get current playback state asynchronously"""
+        try:
+            # Run the synchronous Spotipy call in a thread pool
+            loop = asyncio.get_event_loop()
+            current_playback = await loop.run_in_executor(
+                None, 
+                self.spotify.current_playback
+            )
+            return current_playback
+        except Exception as e:
+            print(f"Error getting current playback: {e}")
+            return None
 
-    def getCurrentSongInfo(self) -> dict:
+    async def getCurrentSongInfo(self) -> dict:
         # Get current song information including title, artist, duration, and release year
         
         # Returns:
@@ -351,7 +385,7 @@ class SpotifyController:
             print(f"[bold red]Error getting current song information: {e}[/bold red]")
             return None
 
-    def play_previous_song(self) -> None:
+    async def play_previous_song(self) -> None:
             # 
             # Plays the previous song in the queue.
 
@@ -360,7 +394,7 @@ class SpotifyController:
             # 
             self.spotify.previous_track(device_id=self.default_device_id)
 
-    def get_album_uri(self, name: str) -> str:
+    async def get_album_uri(self, name: str) -> str:
             # 
             # Searches for and returns the Spotify URI for an album.
 
@@ -378,7 +412,7 @@ class SpotifyController:
                 raise InvalidSearchError(f"No album found with name: {name}")
             return results["albums"]["items"][0]["uri"]
 
-    def get_track_uri(self, name: str) -> str:
+    async def get_track_uri(self, name: str) -> str:
             # 
             # Searches for and returns the Spotify URI for a track.
 
@@ -396,7 +430,7 @@ class SpotifyController:
                 raise InvalidSearchError(f"No track found with name: {name}")
             return results["tracks"]["items"][0]["uri"]
 
-    def get_artist_uri(self, name: str) -> str:
+    async def get_artist_uri(self, name: str) -> str:
             # 
             # Searches for and returns the Spotify URI for an artist.
 
@@ -414,7 +448,7 @@ class SpotifyController:
                 raise InvalidSearchError(f"No artist found with name: {name}")
             return results["artists"]["items"][0]["uri"]
 
-    def play_artist(self, uri: str) -> Spotify:
+    async def play_artist(self, uri: str) -> Spotify:
         # 
         # Plays an artist's top tracks from their Spotify URI.
 
@@ -427,7 +461,7 @@ class SpotifyController:
         self.spotify.start_playback(context_uri=uri, device_id=self.default_device_id)
         return self.spotify
 
-    def play_playlist(self, playlist_id: str) -> Spotify:
+    async def play_playlist(self, playlist_id: str) -> Spotify:
         # 
         # Plays a playlist from its Spotify ID.
 
@@ -440,7 +474,7 @@ class SpotifyController:
         self.spotify.start_playback(context_uri=f"spotify:playlist:{playlist_id}", device_id=self.default_device_id)
         return self.spotify
 
-    def next_track(self) -> Spotify:
+    async def next_track(self) -> Spotify:
         # 
         # Skips to the next track in the current playback queue.
 
@@ -450,7 +484,7 @@ class SpotifyController:
         self.spotify.next_track(device_id=self.default_device_id)
         return self.spotify
 
-    def pause_track(self) -> Spotify:
+    async def pause_track(self) -> Spotify:
         # 
         # Pauses the currently playing track.
 
@@ -470,7 +504,7 @@ class SpotifyController:
                 print(f"[bold red]An error occurred: {str(e)}[/bold red]")
             return self.spotify
 
-    def resume_track(self) -> Spotify:
+    async def resume_track(self) -> Spotify:
         # 
         # Resumes the currently paused track.
 
@@ -490,7 +524,7 @@ class SpotifyController:
                 print(f"[bold red]An error occurred: {str(e)}[/bold red]")
             return self.spotify
 
-    def is_shuffle_on(self) -> bool:
+    async def is_shuffle_on(self) -> bool:
         # 
         # Checks if shuffle mode is currently enabled.
 
@@ -507,7 +541,7 @@ class SpotifyController:
             print("[bold yellow]No active playback session.[/bold yellow]")
             return False
 
-    def getCoverImage(self) -> str:
+    async def getCoverImage(self) -> str:
         """
         Gets the URL of the cover image for the currently playing track.
     
@@ -532,7 +566,7 @@ class SpotifyController:
         # images[2] = small
         return images[0]['url']    
 
-    def shuffle(self, state: str = None) -> None:
+    async def shuffle(self, state: str = None) -> None:
         # 
         # Toggles shuffle mode or sets it to a specific state.
 
@@ -561,7 +595,7 @@ class SpotifyController:
         else:
             print(f"[bold yellow]Shuffle is already {'on' if new_state else 'off'}.[/bold yellow]")
 
-    def change_volume(self, volume: int) -> Spotify:
+    async def change_volume(self, volume: int) -> Spotify:
         # 
         # Changes the volume of the playback.
 
@@ -578,7 +612,7 @@ class SpotifyController:
         print(f"[bold green]Volume set to {volume}%[/bold green]")
         return self.spotify
 
-    def repeat_track(self) -> Spotify:
+    async def repeat_track(self) -> Spotify:
         # 
         # Toggles repeat mode for the current track.
 
@@ -599,7 +633,7 @@ class SpotifyController:
             print("[bold yellow]No active playback session.[/bold yellow]")
         return self.spotify
 
-    def shuffle(self, state: str) -> Spotify:
+    async def shuffle(self, state: str) -> Spotify:
         # 
         # Sets the shuffle state for the player.
 
@@ -617,7 +651,7 @@ class SpotifyController:
         print(f"[bold green]Shuffle {'enabled' if state_bool else 'disabled'}.[/bold green]")
         return self.spotify
 
-    def get_user_saved_tracks(self) -> list:
+    async def get_user_saved_tracks(self) -> list:
         # 
         # Retrieves a list of tracks saved in the user's library.
 
@@ -641,7 +675,7 @@ class SpotifyController:
         
         return tracks
 
-    def init_default_device(self, local_device) -> str:
+    async def init_default_device(self, local_device) -> str:
         # Initializes the default device for playback.
 
         # Args:
